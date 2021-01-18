@@ -7,7 +7,7 @@ import argparse
 # источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую
 # example:
 # cameraSource = 0
-# cameraSource = 'http://qwerty:12345@192.168.43.1:8080/video' # работает!
+# cameraSource = 'http://qwerty:12345@192.168.43.1:8080/video'
 cameraSource = 'http://qwerty:12345@192.168.43.1:8080/video' # работает!
 
 
@@ -36,7 +36,7 @@ video_capture = cv2.VideoCapture(cameraSource)
 
 face_locations = []
 while True:
-    ret = video_capture.open()
+    ret = video_capture.open(cameraSource)
     if not ret:
         print("Camera doesn't opened!")
         print(f"Address of webcam:  {cameraSource}")
