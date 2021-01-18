@@ -1,9 +1,14 @@
 import cv2
 import face_recognition
 import requests
+import sys
+import argparse
 
-# источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую5
-cameraSource = 1
+# источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую
+# example:
+# cameraSource = 'rtsp://192.168.1.64/1'
+# cameraSource = 0
+cameraSource = 0
 
 # лица, занимающие меньше X% по среднему арифметическому отношений ширины и высоты к экрану отсеиваются
 kMinFace = 0.1
@@ -11,6 +16,19 @@ kMinFace = 0.1
 # коэффициенты масштабирования входного изображения перед обработкой
 kx = 0.25
 ky = 0.25
+
+# обработка консольных параметров, перезапись констант, если они были переданы
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-vc', '--vebcam', default=cameraSource)
+    parser.add_argument('-kmin', default=kMinFace)
+    parser.add_argument('-kx', default=kx)
+    parser.add_argument('-ky', default=ky)
+    namespace = parser.parse_args(sys.argv[1:])
+    cameraSource = int(namespace.vebcam)
+    kMinFace = float(namespace.kmin)
+    kx = float(namespace.kx)
+    ky = float(namespace.ky)
 
 # video_capture = cv2.VideoCapture('rtsp://192.168.1.64/1')
 video_capture = cv2.VideoCapture(cameraSource)
