@@ -20,12 +20,12 @@ ky = 0.25
 # обработка консольных параметров, перезапись констант, если они были переданы
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-vc', '--vebcam', default=cameraSource)
+    parser.add_argument('-wc', '--webcam', default=cameraSource)
     parser.add_argument('-kmin', default=kMinFace)
     parser.add_argument('-kx', default=kx)
     parser.add_argument('-ky', default=ky)
     namespace = parser.parse_args(sys.argv[1:])
-    cameraSource = int(namespace.vebcam)
+    cameraSource = int(namespace.webcam)
     kMinFace = float(namespace.kmin)
     kx = float(namespace.kx)
     ky = float(namespace.ky)
