@@ -3,7 +3,8 @@ import face_recognition
 import requests
 import sys
 import argparse
-
+from math import sqrt, pow
+from time import sleep
 # источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую
 # example:
 # cameraSource = 0 # работает, локальная камера
@@ -17,6 +18,26 @@ kMinFace = 0.1
 # коэффициенты масштабирования входного изображения перед обработкой
 kx = 0.25
 ky = 0.25
+
+maxDistance = 0.5
+def differ(oldFace, newFace):
+    (top0, right0, bottom0, left0) = oldFace
+    (top1, right1, bottom1, left1) = newFace
+    amax = max([(abs(bottom0 - top0)),
+                (abs(bottom1 - top1)),
+                (abs(right0 - left0)),
+                (abs(right1 - left1))
+                ]) # максимальная сторона прямоугольника
+    center0 = [top0 + (bottom0 - top0)/2, left0 + (right0 - left0)/2]
+    center1 = [top1 + (bottom1 - top1)/2, left1 + (right1 - left1)/2]
+
+    centerDif = sqrt(
+        pow(center1[0] - center0[0], 2) +
+        pow(center1[1] - center0[1], 2)
+    )
+    return centerDif/amax
+
+
 
 # обработка консольных параметров, перезапись констант, если они были переданы
 if __name__ == "__main__":
@@ -34,6 +55,7 @@ if __name__ == "__main__":
 # video_capture = cv2.VideoCapture('rtsp://192.168.1.64/1')
 video_capture = cv2.VideoCapture(cameraSource)
 
+last_face_locations = []
 face_locations = []
 while True:
     ret, frame = video_capture.read()
@@ -48,11 +70,11 @@ while True:
 
         small_frame = cv2.resize(frame, (0, 0), fx=kx, fy=ky)
         rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
-
         face_locations = face_recognition.face_locations(rgb_small_frame)
-        if face_locations:
-            (top, right, bottom, left) = face_locations[0]
-            print(f"k = {1 / 2 * ((bottom - top) / (camHeight * ky) + (right - left) / (camWidth * kx))}")
+        if not face_locations:
+            continue
+        if not last_face_locations:
+            last_face_locations = face_locations
 
         for (top, right, bottom, left) in face_locations:
             if 1/2*((bottom - top)/(camHeight*ky) + (right - left)/(camWidth*kx)) > kMinFace:
@@ -65,11 +87,19 @@ while True:
                 # Draw a box around the face
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
 
+        for newFace in face_locations:
+            for oldFace in last_face_locations:
+                if differ(oldFace, newFace) < maxDistance:
+                    break
+            else:
+                print("new face detect!")
+        last_face_locations = face_locations
         cv2.imshow('Video', frame)
 
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
+print(face_locations)
 video_capture.release()
 cv2.destroyAllWindows()
 
