@@ -19,7 +19,9 @@ kMinFace = 0.1
 kx = 0.25
 ky = 0.25
 
+# максимальное расстояние между центрами лиц, при котором они считаются одним. Измеряется в долях по отношению к наибольшей стороне прямоугольника лица.
 maxDistance = 0.5
+
 def differ(oldFace, newFace):
     (top0, right0, bottom0, left0) = oldFace
     (top1, right1, bottom1, left1) = newFace
@@ -43,12 +45,14 @@ def differ(oldFace, newFace):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-wc', '--webcam', default=cameraSource)
-    parser.add_argument('-kmin', default=kMinFace)
+    parser.add_argument('-kmin', '--kMinFace', default=kMinFace)
+    parser.add_argument('-maxD', '--maxDistance', default=maxDistance)
     parser.add_argument('-kx', default=kx)
     parser.add_argument('-ky', default=ky)
     namespace = parser.parse_args(sys.argv[1:])
     cameraSource = namespace.webcam
-    kMinFace = float(namespace.kmin)
+    kMinFace = float(namespace.kMinFace)
+    maxDistance = float(namespace.maxDistance)
     kx = float(namespace.kx)
     ky = float(namespace.ky)
 
@@ -99,7 +103,7 @@ while True:
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
-print(face_locations)
+
 video_capture.release()
 cv2.destroyAllWindows()
 
