@@ -3,13 +3,10 @@ import face_recognition
 import requests
 import sys
 import argparse
-<<<<<<< Updated upstream
-=======
 from math import sqrt, pow
 from time import sleep, time
 import pandas as pd
 
->>>>>>> Stashed changes
 
 # источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую
 # example:
@@ -25,8 +22,7 @@ kMinFace = 0.1
 kx = 0.25
 ky = 0.25
 
-<<<<<<< Updated upstream
-=======
+
 # максимальное расстояние между центрами лиц, при котором они считаются одним. Измеряется в долях по отношению к наибольшей стороне прямоугольника лица.
 maxDistance = 0.9
 
@@ -80,7 +76,6 @@ def upload(image):
     session.close()
 
 
->>>>>>> Stashed changes
 # обработка консольных параметров, перезапись констант, если они были переданы
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -96,7 +91,7 @@ if __name__ == "__main__":
 
 # video_capture = cv2.VideoCapture('rtsp://192.168.1.64/1')
 video_capture = cv2.VideoCapture(cameraSource)
-
+last_face_locations = []
 face_locations = []
 while True:
 
@@ -114,19 +109,11 @@ while True:
         rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
 
         face_locations = face_recognition.face_locations(rgb_small_frame)
-<<<<<<< Updated upstream
-        if face_locations:
-            (top, right, bottom, left) = face_locations[0]
-            print(f"k = {1 / 2 * ((bottom - top) / (camHeight * ky) + (right - left) / (camWidth * kx))}")
-
-=======
-
         if not face_locations:
             continue
         if not last_face_locations:
             last_face_locations = face_locations
         print(len(face_locations))
->>>>>>> Stashed changes
         for (top, right, bottom, left) in face_locations:
             if 1/2*((bottom - top)/(camHeight*ky) + (right - left)/(camWidth*kx)) > kMinFace:
                 # Scale back up face locations since the frame we detected in was scaled to 1/4 size
@@ -136,10 +123,8 @@ while True:
                 left *= int(1/kx)
                 # Draw a box around the face
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-<<<<<<< Updated upstream
 
-        cv2.imshow('Video', frame)
-=======
+
         start = time()
         for newFace in face_locations:
             for oldFace in last_face_locations:
@@ -150,11 +135,11 @@ while True:
                 [top, right, bottom, left] = [border*4 for border in newFace]
                 imageToSend = frame[top:bottom, left:right]
                 cv2.imshow(f"new face detect! {newFace}", imageToSend)
+                imageToSend = cv2.cvtColor(imageToSend, cv2.COLOR_BGR2RGB)
                 upload(imageToSend)
         dur = time() - start
 
         last_face_locations = face_locations
->>>>>>> Stashed changes
 
         cv2.imshow('Video', frame)
         sleep(0.5)
