@@ -15,6 +15,9 @@ import pandas as pd
 # cameraSource = 'http://homecam:15243@10.243.165.231:8080/video' # не работает,  ip webcam, интернет
 cameraSource = 0
 
+# адрес назначения, для отправления найденных лиц
+urlDist = "http://127.0.0.1:8000"
+
 # лица, занимающие меньше X% по среднему арифметическому отношений ширины и высоты к экрану отсеиваются
 kMinFace = 0.1
 
@@ -27,6 +30,7 @@ ky = 0.25
 maxDistance = 0.9
 
 def differ(oldFace, newFace) -> float:
+# коэффициент разницы положений лиц, отношение расстояний между центрами к самой длинной стороне
     (top0, right0, bottom0, left0) = oldFace
     (top1, right1, bottom1, left1) = newFace
     amax = max([(abs(bottom0 - top0)),
@@ -44,6 +48,7 @@ def differ(oldFace, newFace) -> float:
     return centerDif/amax
 
 def arrayImage2json(arrayImage):
+# перекодируем картинку в формат json
     a = arrayImage
     red = a[:, :, 0]
     gre = a[:, :, 1]
@@ -59,32 +64,32 @@ def arrayImage2json(arrayImage):
 
     data = {
         "red": rj,
-        "green":gj,
+        "green": gj,
         "blue": bj
     }
     return data
 
-
-def upload(image):
-    session = requests.Session()
-    url = "http://127.0.0.1:8000"
+def upload(image, url):
+# отправляем картинку по указанному url
+    # session = requests.Session()
     data = arrayImage2json(image)
     try:
-        r = session.post(url, data=data)
+        r = requests.post(url, data=data)
     except Exception:
         print("Error in connection to server")
-    session.close()
-
+    # session.close()
 
 # обработка консольных параметров, перезапись констант, если они были переданы
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-wc', '--webcam', default=cameraSource)
+    parser.add_argument('-dist', '--urlDist', default=urlDist)
     parser.add_argument('-kmin', default=kMinFace)
     parser.add_argument('-kx', default=kx)
     parser.add_argument('-ky', default=ky)
     namespace = parser.parse_args(sys.argv[1:])
     cameraSource = namespace.webcam
+    urlDist = namespace.urlDist
     kMinFace = float(namespace.kmin)
     kx = float(namespace.kx)
     ky = float(namespace.ky)
@@ -94,7 +99,7 @@ video_capture = cv2.VideoCapture(cameraSource)
 last_face_locations = []
 face_locations = []
 while True:
-
+    start = time()
     ret, frame = video_capture.read()
     if not ret:
         print("Video doesn't accepted!")
@@ -105,15 +110,21 @@ while True:
         camWidth = video_capture.get(3)
         camHeight = video_capture.get(4)
 
+        #изменение размера, перевод картинки в формат rgb
         small_frame = cv2.resize(frame, (0, 0), fx=kx, fy=ky)
         rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
 
+        # определение координат лиц (прямоугольников)
         face_locations = face_recognition.face_locations(rgb_small_frame)
+
+        # заполнение массивов (для первого запуска)
         if not face_locations:
             continue
         if not last_face_locations:
             last_face_locations = face_locations
-        print(len(face_locations))
+
+        # отрисовка прямоугольников на экран
+        # сравнение размера прямоугольника с минимальным
         for (top, right, bottom, left) in face_locations:
             if 1/2*((bottom - top)/(camHeight*ky) + (right - left)/(camWidth*kx)) > kMinFace:
                 # Scale back up face locations since the frame we detected in was scaled to 1/4 size
@@ -124,8 +135,9 @@ while True:
                 # Draw a box around the face
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
 
-
-        start = time()
+        # трекинг: поиск совпадений местонахождеий лиц а прошлом кадре
+        # если найдено повторение - прекратить поиск
+        # если нет ни одного повторения - вырезать и отправить лицо
         for newFace in face_locations:
             for oldFace in last_face_locations:
                 if differ(oldFace, newFace) < maxDistance:
@@ -136,16 +148,15 @@ while True:
                 imageToSend = frame[top:bottom, left:right]
                 cv2.imshow(f"new face detect! {newFace}", imageToSend)
                 imageToSend = cv2.cvtColor(imageToSend, cv2.COLOR_BGR2RGB)
-                upload(imageToSend)
-        dur = time() - start
+                upload(imageToSend, urlDist)
 
+        # текущий кадр становится прошлым, отрисовка окна видео
         last_face_locations = face_locations
-
         cv2.imshow('Video', frame)
-        sleep(0.5)
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
+# закрываем видеопоток и окна
 video_capture.release()
 cv2.destroyAllWindows()
 
