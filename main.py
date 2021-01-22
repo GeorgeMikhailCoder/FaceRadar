@@ -4,10 +4,10 @@ import requests
 import sys
 import argparse
 from math import sqrt, pow
-from time import sleep, time
 import pandas as pd
-from os import system
-import ffmpeg
+
+# удалить в релизе
+from icecream import ic
 
 
 
@@ -16,13 +16,17 @@ print("start")
 # example:
 # cameraSource = 0 # работает, локальная камера
 # cameraSource = 'http://homecam:15243@192.168.43.1:8080/video' # работает, ip webcam, локальная сеть
-cameraSource = "rtsp://op1:Qw123456@109.194.108.56:1554/ISAPI/Streaming/Channels/101"
+# cameraSource = "rtsp://op1:Qw123456@109.194.108.56:1554/ISAPI/Streaming/Channels/101"
+cameraSource = 0
 
 # адрес назначения, для отправления найденных лиц
 urlDist = "http://127.0.0.1:8000"
 
 # лица, занимающие меньше X% по среднему арифметическому отношений ширины и высоты к экрану отсеиваются
 kMinFace = 0.1
+
+# количество пустых кадров, в течение которых прежние положения лиц будут храниться в памяти
+maxKadrEmpry = 100
 
 # коэффициенты уменьшения масштабв входного изображения перед обработкой
 kx = 0.25
@@ -75,9 +79,13 @@ def arrayImage2json(arrayImage):
 def upload(image, url):
 # отправляем картинку по указанному url
     # session = requests.Session()
-    data = arrayImage2json(image)
+    # data = arrayImage2json(image)
+    size = image.shape[0:2]
+    data = image.tobytes()
+    print(size)
+
     try:
-        r = requests.post(url, data=data)
+        r = requests.post(url, data={"size": size, "image": data})
     except Exception:
         print("Error in connection to server")
     # session.close()
@@ -88,20 +96,26 @@ if __name__ == "__main__":
     parser.add_argument('-wc', '--webcam', default=cameraSource)
     parser.add_argument('-dist', '--urlDist', default=urlDist)
     parser.add_argument('-kmin', default=kMinFace)
+    parser.add_argument('-maxKadrEmpry', default=maxKadrEmpry)
     parser.add_argument('-kx', default=kx)
     parser.add_argument('-ky', default=ky)
     namespace = parser.parse_args(sys.argv[1:])
     cameraSource = namespace.webcam
     urlDist = namespace.urlDist
     kMinFace = float(namespace.kmin)
+    maxKadrEmpry = int(namespace.maxKadrEmpry)
     kx = float(namespace.kx)
     ky = float(namespace.ky)
 
-# video_capture = cv2.VideoCapture('rtsp://192.168.1.64/1')
-video_capture = cv2.VideoCapture(cameraSource, cv2.CAP_FFMPEG)
+if type(cameraSource) == int: # for local
+    video_capture = cv2.VideoCapture(cameraSource)
+else: # for rtsp
+    video_capture = cv2.VideoCapture(cameraSource, cv2.CAP_FFMPEG)
 
 last_face_locations = []
 face_locations = []
+
+kadrEmpty = 0
 frame = None
 while True:
     if cv2.waitKey(1) & 0xFF == 27:
@@ -112,7 +126,7 @@ while True:
         print(f"Address of webcam:  {cameraSource}")
         break
     else:
-
+        ic(kadrEmpty)
         # CAP_PROP_FOURCC = 875967080.0
         # CAP_PROP_CODEC_PIXEL_FORMAT = 808596553.0
         # ширина и высота экрана
@@ -130,10 +144,16 @@ while True:
 
         # заполнение массивов (для первого запуска)
         if not face_locations:
+            kadrEmpty += 1
+            if kadrEmpty>maxKadrEmpry:
+                last_face_locations = []
             cv2.imshow('Video', frame)
             continue
-        if not last_face_locations:
-            last_face_locations = face_locations
+        else:
+            kadrEmpty = 0
+
+        # if not last_face_locations:
+        #     last_face_locations = face_locations
 
         # отрисовка прямоугольников на экран
         # сравнение размера прямоугольника с минимальным
@@ -150,8 +170,11 @@ while True:
         # трекинг: поиск совпадений местонахождеий лиц а прошлом кадре
         # если найдено повторение - прекратить поиск
         # если нет ни одного повторения - вырезать и отправить лицо
+        ic(last_face_locations)
+        ic(face_locations)
         for newFace in face_locations:
             for oldFace in last_face_locations:
+                ic("double cycle")
                 if differ(oldFace, newFace) < maxDistance:
                     break
             else:
