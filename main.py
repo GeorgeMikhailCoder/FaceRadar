@@ -6,14 +6,17 @@ import argparse
 from math import sqrt, pow
 from time import sleep, time
 import pandas as pd
+from os import system
+import ffmpeg
 
 
+
+print("start")
 # источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую
 # example:
 # cameraSource = 0 # работает, локальная камера
 # cameraSource = 'http://homecam:15243@192.168.43.1:8080/video' # работает, ip webcam, локальная сеть
-# cameraSource = 'http://homecam:15243@10.243.165.231:8080/video' # не работает,  ip webcam, интернет
-cameraSource = 0
+cameraSource = "rtsp://op1:Qw123456@109.194.108.56:1554/ISAPI/Streaming/Channels/101"
 
 # адрес назначения, для отправления найденных лиц
 urlDist = "http://127.0.0.1:8000"
@@ -95,30 +98,39 @@ if __name__ == "__main__":
     ky = float(namespace.ky)
 
 # video_capture = cv2.VideoCapture('rtsp://192.168.1.64/1')
-video_capture = cv2.VideoCapture(cameraSource)
+video_capture = cv2.VideoCapture(cameraSource, cv2.CAP_FFMPEG)
+
 last_face_locations = []
 face_locations = []
+frame = None
 while True:
-    start = time()
+    if cv2.waitKey(1) & 0xFF == 27:
+        break
     ret, frame = video_capture.read()
     if not ret:
         print("Video doesn't accepted!")
         print(f"Address of webcam:  {cameraSource}")
         break
     else:
+
+        # CAP_PROP_FOURCC = 875967080.0
+        # CAP_PROP_CODEC_PIXEL_FORMAT = 808596553.0
         # ширина и высота экрана
         camWidth = video_capture.get(3)
         camHeight = video_capture.get(4)
+        cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         #изменение размера, перевод картинки в формат rgb
         small_frame = cv2.resize(frame, (0, 0), fx=kx, fy=ky)
-        rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+        #rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+        rgb_small_frame = small_frame
 
         # определение координат лиц (прямоугольников)
         face_locations = face_recognition.face_locations(rgb_small_frame)
 
         # заполнение массивов (для первого запуска)
         if not face_locations:
+            cv2.imshow('Video', frame)
             continue
         if not last_face_locations:
             last_face_locations = face_locations
@@ -153,8 +165,8 @@ while True:
         # текущий кадр становится прошлым, отрисовка окна видео
         last_face_locations = face_locations
         cv2.imshow('Video', frame)
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
+
+
 
 # закрываем видеопоток и окна
 video_capture.release()
