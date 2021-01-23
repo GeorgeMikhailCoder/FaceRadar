@@ -1,15 +1,10 @@
 import cv2
-import face_recognition
-import requests
+from face_recognition import face_locations
+from requests import post
 import sys
 import argparse
 from math import sqrt, pow
-import pandas as pd
-
-# удалить в релизе
-from icecream import ic
-
-
+from pandas import DataFrame
 
 print("start")
 # источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую
@@ -61,9 +56,9 @@ def arrayImage2json(arrayImage):
     gre = a[:, :, 1]
     blu = a[:, :, 2]
 
-    rpd = pd.DataFrame(data=red)
-    gpd = pd.DataFrame(data=gre)
-    bpd = pd.DataFrame(data=blu)
+    rpd = DataFrame(data=red)
+    gpd = DataFrame(data=gre)
+    bpd = DataFrame(data=blu)
 
     rj = rpd.to_json()
     gj = gpd.to_json()
@@ -79,13 +74,9 @@ def arrayImage2json(arrayImage):
 def upload(image, url):
 # отправляем картинку по указанному url
     # session = requests.Session()
-    # data = arrayImage2json(image)
-    size = image.shape[0:2]
-    data = image.tobytes()
-    print(size)
-
+    data = arrayImage2json(image)
     try:
-        r = requests.post(url, data={"size": size, "image": data})
+        r = post(url, data=data)
     except Exception:
         print("Error in connection to server")
     # session.close()
@@ -113,7 +104,7 @@ else: # for rtsp
     video_capture = cv2.VideoCapture(cameraSource, cv2.CAP_FFMPEG)
 
 last_face_locations = []
-face_locations = []
+cur_face_locations = []
 
 kadrEmpty = 0
 frame = None
@@ -126,7 +117,6 @@ while True:
         print(f"Address of webcam:  {cameraSource}")
         break
     else:
-        ic(kadrEmpty)
         # CAP_PROP_FOURCC = 875967080.0
         # CAP_PROP_CODEC_PIXEL_FORMAT = 808596553.0
         # ширина и высота экрана
@@ -140,10 +130,10 @@ while True:
         rgb_small_frame = small_frame
 
         # определение координат лиц (прямоугольников)
-        face_locations = face_recognition.face_locations(rgb_small_frame)
+        cur_face_locations = face_locations(rgb_small_frame)
 
         # заполнение массивов (для первого запуска)
-        if not face_locations:
+        if not cur_face_locations:
             kadrEmpty += 1
             if kadrEmpty>maxKadrEmpry:
                 last_face_locations = []
@@ -157,7 +147,7 @@ while True:
 
         # отрисовка прямоугольников на экран
         # сравнение размера прямоугольника с минимальным
-        for (top, right, bottom, left) in face_locations:
+        for (top, right, bottom, left) in cur_face_locations:
             if 1/2*((bottom - top)/(camHeight*ky) + (right - left)/(camWidth*kx)) > kMinFace:
                 # Scale back up face locations since the frame we detected in was scaled to 1/4 size
                 top *= int(1/ky)
@@ -170,11 +160,8 @@ while True:
         # трекинг: поиск совпадений местонахождеий лиц а прошлом кадре
         # если найдено повторение - прекратить поиск
         # если нет ни одного повторения - вырезать и отправить лицо
-        ic(last_face_locations)
-        ic(face_locations)
-        for newFace in face_locations:
+        for newFace in cur_face_locations:
             for oldFace in last_face_locations:
-                ic("double cycle")
                 if differ(oldFace, newFace) < maxDistance:
                     break
             else:
@@ -186,7 +173,7 @@ while True:
                 upload(imageToSend, urlDist)
 
         # текущий кадр становится прошлым, отрисовка окна видео
-        last_face_locations = face_locations
+        last_face_locations = cur_face_locations
         cv2.imshow('Video', frame)
 
 
