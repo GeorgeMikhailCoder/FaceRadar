@@ -5,23 +5,27 @@ import sys
 import argparse
 from math import sqrt, pow
 from pandas import DataFrame
+from os import remove
+from time import sleep
 
 print("start")
 # источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую
 # example:
 # cameraSource = 0 # работает, локальная камера
-# cameraSource = 'http://homecam:15243@192.168.43.1:8080/video' # работает, ip webcam, локальная сеть
+cameraSource = 'http://homecam:15243@192.168.43.1:8080/video' # работает, ip webcam, локальная сеть
 # cameraSource = "rtsp://op1:Qw123456@109.194.108.56:1554/ISAPI/Streaming/Channels/101"
-cameraSource = 0
+# cameraSource = 0
 
 # адрес назначения, для отправления найденных лиц
 urlDist = "http://127.0.0.1:8000"
+# urlDist = "https://enhod9mv9wlxpy8.m.pipedream.net" # мой адрес
+# urlDist = "https://enazur7xr2301az.m.pipedream.net" # адрес Романа
 
 # лица, занимающие меньше X% по среднему арифметическому отношений ширины и высоты к экрану отсеиваются
-kMinFace = 0.1
+kMinFace = 0.01
 
 # количество пустых кадров, в течение которых прежние положения лиц будут храниться в памяти
-maxKadrEmpry = 100
+maxKadrEmpry = 50
 
 # коэффициенты уменьшения масштабв входного изображения перед обработкой
 kx = 0.25
@@ -35,11 +39,11 @@ def differ(oldFace, newFace) -> float:
 # коэффициент разницы положений лиц, отношение расстояний между центрами к самой длинной стороне
     (top0, right0, bottom0, left0) = oldFace
     (top1, right1, bottom1, left1) = newFace
-    amax = max([(abs(bottom0 - top0)),
+    amax = min([(abs(bottom0 - top0)),
                 (abs(bottom1 - top1)),
                 (abs(right0 - left0)),
                 (abs(right1 - left1))
-                ]) # максимальная сторона прямоугольника
+                ]) # минимальная сторона прямоугольника (меньшего лица)
     center0 = [top0 + (bottom0 - top0)/2, left0 + (right0 - left0)/2]
     center1 = [top1 + (bottom1 - top1)/2, left1 + (right1 - left1)/2]
 
@@ -74,11 +78,18 @@ def arrayImage2json(arrayImage):
 def upload(image, url):
 # отправляем картинку по указанному url
     # session = requests.Session()
-    data = arrayImage2json(image)
+    # data = arrayImage2json(image)
+    name = "screen.jpg"
+    cv2.imwrite(name, image)
+    file = open(name, 'rb')
     try:
-        r = post(url, data=data)
+        r = post(urlDist, files={name: file})
     except Exception:
         print("Error in connection to server")
+    finally:
+        file.close()
+        remove(name)
+
     # session.close()
 
 # обработка консольных параметров, перезапись констант, если они были переданы
@@ -98,10 +109,10 @@ if __name__ == "__main__":
     kx = float(namespace.kx)
     ky = float(namespace.ky)
 
-if type(cameraSource) == int: # for local
-    video_capture = cv2.VideoCapture(cameraSource)
-else: # for rtsp
+if type(cameraSource) == str and cameraSource[0:4] == "rtsp": # for rtsp
     video_capture = cv2.VideoCapture(cameraSource, cv2.CAP_FFMPEG)
+else:
+    video_capture = cv2.VideoCapture(cameraSource)
 
 last_face_locations = []
 cur_face_locations = []
@@ -123,6 +134,11 @@ while True:
         camWidth = video_capture.get(3)
         camHeight = video_capture.get(4)
         cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # cv2.imwrite("screen.jpg", frame)
+        # img = {"screen.jpg": open("screen.jpg", 'rb')}
+        # r = post(urlDist, files=img)
+        # break
+
 
         #изменение размера, перевод картинки в формат rgb
         small_frame = cv2.resize(frame, (0, 0), fx=kx, fy=ky)
@@ -156,6 +172,8 @@ while True:
                 left *= int(1/kx)
                 # Draw a box around the face
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+            else:
+                cur_face_locations.remove((top, right, bottom, left))
 
         # трекинг: поиск совпадений местонахождеий лиц а прошлом кадре
         # если найдено повторение - прекратить поиск
@@ -166,10 +184,14 @@ while True:
                     break
             else:
                 print(f"new face detect! {newFace}")
-                [top, right, bottom, left] = [border*4 for border in newFace]
+                (top, right, bottom, left) = newFace
+                print(f"k = {1 / 2 * ((bottom - top) / (camHeight * ky) + (right - left) / (camWidth * kx))}")
+                top *= int(1 / ky)
+                right *= int(1 / kx)
+                bottom *= int(1 / ky)
+                left *= int(1 / kx)
                 imageToSend = frame[top:bottom, left:right]
-                cv2.imshow(f"new face detect! {newFace}", imageToSend)
-                imageToSend = cv2.cvtColor(imageToSend, cv2.COLOR_BGR2RGB)
+                cv2.imshow("new face detect!", imageToSend)
                 upload(imageToSend, urlDist)
 
         # текущий кадр становится прошлым, отрисовка окна видео
