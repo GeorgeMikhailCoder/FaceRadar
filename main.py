@@ -11,7 +11,7 @@ from icecream import ic
 from cv2 import CascadeClassifier
 from dlib import cnn_face_detection_model_v1
 from dlib import get_frontal_face_detector
-from threading import Thread
+from threading import Thread, Lock
 from queue import Queue
 
 
@@ -165,7 +165,7 @@ def chooseMethod(rgb_small_frame):
     return cur_face_locations
 
 def detect(Qarg):
-    frame, last_face_locations, kadrEmpty = Qarg.get()
+    frame, last_face_locations, kadrEmpty = Qarg
 
     # изменение размера, перевод картинки в формат rgb
     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -179,8 +179,7 @@ def detect(Qarg):
         kadrEmpty += 1
         if kadrEmpty > maxKadrEmpty:
             last_face_locations = []
-        Qarg.put((frame, last_face_locations, kadrEmpty))
-        return
+        return (frame, last_face_locations, kadrEmpty)
     else:
         kadrEmpty = 0
 
@@ -204,8 +203,15 @@ def detect(Qarg):
 
     # текущий кадр становится прошлым, отрисовка окна видео
     last_face_locations = cur_face_locations
-    Qarg.put((frame, last_face_locations, kadrEmpty))
-    return
+    return (frame, last_face_locations, kadrEmpty)
+start = time()
+def threadProcess(argList, func, inArgs, prev):
+    global countProc
+    res = func(inArgs)
+    if None != prev:
+        prev.join()
+    argList.put(res)
+
 
 # обработка консольных параметров, перезапись констант, если они были переданы
 if __name__ == "__main__":
@@ -241,33 +247,40 @@ if __name__ == "__main__":
     faceCascade = CascadeClassifier('haarcascade_frontalface_default.xml')
     dnnFaceDetector = cnn_face_detection_model_v1("mmod_human_face_detector.dat")
     HOG_face_detect = get_frontal_face_detector()
-    threadOfDetect = Thread()
-    Qarg = Queue()
-    while True:
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
-        ret, frame = video_capture.read()
 
+    argList = Queue()
+    prev = None
+    maxCountProc = 2
+    countProc = 0
+    args = (frame, last_face_locations, kadrEmpty)
+    while True:
+
+        ret, frame = video_capture.read()
         if not ret:
             print("Video doesn't accepted!")
             print(f"Address of webcam:  {cameraSource}")
             break
-        else:
-            # oldFrame = frame
-            Qarg.put((frame, last_face_locations, kadrEmpty))
-            # threadOfDetect = Thread(target= detect, args=(Qarg,))
-            # threadOfDetect.start()
-            # threadOfDetect.join()
-            # frame, last_face_locations, kadrEmpty = Qarg.get()
-            # for face in last_face_locations:
-            #     frame = drawRect1(frame, face)
-            # frame, last_face_locations, kadrEmpty = detect(frame, last_face_locations, kadrEmpty)
-            detect(Qarg)
-            frame, last_face_locations, kadrEmpty = Qarg.get()
-            showImage('Video', frame)
 
 
 
+        while (countProc < maxCountProc):
+            countProc += 1
+            args = (frame, last_face_locations, kadrEmpty)
+            t = Thread(target=threadProcess, args=(argList, detect, args, prev))
+            t.start()
+            prev = t
+
+        if not argList.empty():
+            frame, last_face_locations, kadrEmpty = argList.get()
+            countProc -= 1
+
+        showImage('Video', frame)
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
+
+
+
+    prev.join()
     # old code
     """ 
             #изменение размера, перевод картинки в формат rgb
