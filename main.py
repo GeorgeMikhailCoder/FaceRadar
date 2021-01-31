@@ -36,16 +36,19 @@ kMinFace = 0.01
 # количество пустых кадров, в течение которых прежние положения лиц будут храниться в памяти
 maxKadrEmpty = 50
 
+# количество сбоев в приёме видео до прерывания программы
+maxInAccessWebcam = 10
+
 # коэффициенты уменьшения масштабв входного изображения перед обработкой
 kx = 0.5
 ky = 0.5
 
 
-# максимальное расстояние между центрами лиц, при котором они считаются одним. Измеряется в долях по отношению к наибольшей стороне прямоугольника лица.
+# максимальное расстояние между центрами лиц, при котором они считаются одним. Измеряется в долях по отношению к наименьшей стороне прямоугольника лица.
 maxDistance = 0.9
 
 def differ(oldFace, newFace) -> float:
-# коэффициент разницы положений лиц, отношение расстояний между центрами к самой длинной стороне
+# коэффициент разницы положений лиц, отношение расстояний между центрами к самой короткой стороне
     (top0, right0, bottom0, left0) = oldFace
     (top1, right1, bottom1, left1) = newFace
     amax = min([(abs(bottom0 - top0)),
@@ -129,6 +132,7 @@ def faceDetected(frame, newFace):
     print(f"k = {koefSmall(newFace)}")
     imageToSend = frame[top:bottom, left:right]
     cv2.imshow("new face detect!", imageToSend)
+    # upload(imageToSend, urlDist)
     Thread(target=upload, args=(imageToSend, urlDist)).start()
 
 
@@ -164,6 +168,15 @@ def chooseMethod(rgb_small_frame):
     # cur_face_locations = [(face.rect.top(), face.rect.right(), face.rect.bottom(), face.rect.left())  for face in cur_face_locations]
     return cur_face_locations
 
+
+def tracingFacesSimple(cur_face_locations, last_face_locations):
+        for newFace in cur_face_locations:
+            for oldFace in last_face_locations:
+                if differ(oldFace, newFace) < maxDistance:
+                    break
+            else:
+                faceDetected(frame, newFace)
+
 def detect(Qarg):
     frame, last_face_locations, kadrEmpty = Qarg
 
@@ -191,20 +204,34 @@ def detect(Qarg):
         else:
             cur_face_locations.remove(face)
 
-    # трекинг: поиск совпадений местонахождеий лиц а прошлом кадре
-    # если найдено повторение - прекратить поиск
-    # если нет ни одного повторения - вырезать и отправить лицо
-    for newFace in cur_face_locations:
-        for oldFace in last_face_locations:
-            if differ(oldFace, newFace) < maxDistance:
-                break
-        else:
-            faceDetected(frame, newFace)
+    # # трекинг: поиск совпадений местонахождеий лиц а прошлом кадре
+    # # если найдено повторение - прекратить поиск
+    # # если нет ни одного повторения - вырезать и отправить лицо
+    tracingFacesSimple(cur_face_locations, last_face_locations)
 
-    # текущий кадр становится прошлым, отрисовка окна видео
-    last_face_locations = cur_face_locations
-    return (frame, last_face_locations, kadrEmpty)
-start = time()
+    # текущий кадр становится прошлым
+    return (frame, cur_face_locations, kadrEmpty)
+
+
+
+def tracingToMultiThread(inArgs, res):
+    (frameLast, last_face_locations, kadrEmpty1) = inArgs
+    (frame, cur_face_locations, kadrEmpty2) = res
+
+    ic(kadrEmpty2,kadrEmpty1)
+    if kadrEmpty2 - kadrEmpty1 == 1:
+        return
+    elif kadrEmpty2 - kadrEmpty1 < 0:
+        for newFace in cur_face_locations:
+            faceDetected(frame, newFace)
+    else: # kadrEmpty2 = kadrEmpty1 = 0
+        for newFace in cur_face_locations:
+            for oldFace in last_face_locations:
+                if differ(oldFace, newFace) < maxDistance:
+                    break
+            else:
+                faceDetected(frame, newFace)
+
 def threadProcess(argList, func, inArgs, prev):
     global countProc
     res = func(inArgs)
@@ -212,7 +239,7 @@ def threadProcess(argList, func, inArgs, prev):
         prev.join()
     argList.put(res)
 
-
+start = time()
 # обработка консольных параметров, перезапись констант, если они были переданы
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -242,6 +269,7 @@ if __name__ == "__main__":
     last_face_locations = []
     cur_face_locations = []
 
+    inAccessWebcam = 0
     kadrEmpty = 0
     frame = None
     faceCascade = CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -259,28 +287,30 @@ if __name__ == "__main__":
         if not ret:
             print("Video doesn't accepted!")
             print(f"Address of webcam:  {cameraSource}")
-            break
+            inAccessWebcam += 1
+            if inAccessWebcam > maxInAccessWebcam:
+                break
+        else:
+            inAccessWebcam = 0
 
+            (frame, last_face_locations, kadrEmpty) = detect((frame, last_face_locations, kadrEmpty))
 
-
-        while (countProc < maxCountProc):
-            countProc += 1
-            args = (frame, last_face_locations, kadrEmpty)
-            t = Thread(target=threadProcess, args=(argList, detect, args, prev))
-            t.start()
-            prev = t
-
-        if not argList.empty():
-            frame, last_face_locations, kadrEmpty = argList.get()
-            countProc -= 1
+        # while (countProc < maxCountProc):
+        #     countProc += 1
+        #     args = (frame, last_face_locations, kadrEmpty)
+        #     t = Thread(target=threadProcess, args=(argList, detect, args, prev))
+        #     t.start()
+        #     prev = t
+        #
+        # if not argList.empty():
+        #     frame, last_face_locations, kadrEmpty = argList.get()
+        #     countProc -= 1
 
         showImage('Video', frame)
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
-
-
-    prev.join()
+    # prev.join()
     # old code
     """ 
             #изменение размера, перевод картинки в формат rgb
