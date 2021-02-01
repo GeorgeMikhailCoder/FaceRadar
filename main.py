@@ -21,8 +21,8 @@ print("start")
 # example:
 # cameraSource = 0 # работает, локальная камера
 # cameraSource = 'http://homecam:15243@192.168.43.1:8080/video' # работает, ip webcam, локальная сеть
-# cameraSource = "rtsp://op1:Qw123456@109.194.108.56:1554/ISAPI/Streaming/Channels/101" # первая камера
-# cameraSource = "rtsp://op1:Qw123456@109.194.108.56:2554/ISAPI/Streaming/Channels/101" # вторая камера
+# cameraSource = "rtsp://op1:Qw123456@109.194.108.56:1554/ISAPI/Streaming/Channels/101" # первая камера: парковка
+# cameraSource = "rtsp://op1:Qw123456@109.194.108.56:2554/ISAPI/Streaming/Channels/101" # вторая камера: офис
 cameraSource = 0
 
 # адрес назначения, для отправления найденных лиц
@@ -37,9 +37,12 @@ kMinFace = 0.01
 # количество кадров, в течение которых прежние положения лиц будут храниться в памяти
 maxKadrEmpty = 50
 
+# количество непринятых кадров до завершения программы
+maxInAccessWebcam = 1
+
 # коэффициенты уменьшения масштабв входного изображения перед обработкой
-kx = 0.5
-ky = 0.5
+kx = 1
+ky = 1
 
 
 # максимальное расстояние между центрами лиц, при котором они считаются одним. Измеряется в долях по отношению к наибольшей стороне прямоугольника лица.
@@ -74,28 +77,35 @@ def faceDetected(frame, newFace):
     # upload(imageToSend, urlDist)
     Thread(target=upload, args=(imageToSend, urlDist)).start()
 
-def tracingFacesSimple(cur_face_locations, last_face_locations):
-        for newFace in cur_face_locations:
-            for oldFace in last_face_locations:
-                if differ(oldFace["rect"], newFace["rect"]) < maxDistance:
-                    # найдено соответствие лица в прошлом
-                    oldFace["notInCam"] = 0
-                    break
-            else:
-                # не найдено ни одного соответствия лица
-                faceDetected(frame, newFace["rect"])
+def makeFaceLocationsElder(faceLocations):
+    for face in faceLocations:
+        face["notInCam"] += 1
+        if face["notInCam"] > maxKadrEmpty:
+            faceLocations.remove(face)
+            # удаляет первое вхождение face, одинаковых прямоугольников не бывает
+    return faceLocations
 
+
+def tracingFacesSimple(cur_face_locations, last_face_locations, frame):
+    for newFace in cur_face_locations:
         for oldFace in last_face_locations:
-            if 0 < oldFace["notInCam"] < maxKadrEmpty:
-                # сохраняем кадр в памяти
-                cur_face_locations.append(oldFace)
+            if differ(oldFace["rect"], newFace["rect"]) < maxDistance:
+                # найдено соответствие лица в прошлом
+                oldFace["notInCam"] = 0
+                break
+        else:
+            # не найдено ни одного соответствия лица
+            faceDetected(frame, newFace["rect"])
 
-        # устаревание:
-        for newFace in cur_face_locations:
-            newFace["notInCam"] += 1
+    for oldFace in last_face_locations:
+        if 0 < oldFace["notInCam"] < maxKadrEmpty:
+            # сохраняем кадр в памяти
+            cur_face_locations.append(oldFace)
 
-def detect(Qarg):
-    frame, last_face_locations, kadrEmpty = Qarg
+
+    return cur_face_locations
+
+def detect(frame):
 
     # изменение размера, перевод картинки в формат rgb
     cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -103,15 +113,15 @@ def detect(Qarg):
     # frame = rgb_small_frame
 
     # определили положение лиц
+    t0 = time()
     cur_face_locations = chooseMethod(rgb_small_frame)
+    t1 = time()
+    # print(f"face rec: {t1 - t0:.3f}")
     # заполнение массивов (для первого запуска)
     if len(cur_face_locations) == 0:
-        kadrEmpty += 1
-        if kadrEmpty > maxKadrEmpty:
-            last_face_locations = []
-        return (frame, last_face_locations, kadrEmpty)
-    else:
-        kadrEmpty = 0
+        cur_face_locations = makeFaceLocationsElder(last_face_locations)
+        return (frame, cur_face_locations)
+
 
     # отрисовка прямоугольников на экран
     # сравнение размера прямоугольника с минимальным
@@ -121,42 +131,85 @@ def detect(Qarg):
         else:
             cur_face_locations.remove(face)
 
+    cur_face_locations = face2struct(cur_face_locations)
+    return (frame, cur_face_locations)
+"""
     # трекинг: поиск совпадений местонахождеий лиц а прошлом кадре
     # если найдено повторение - прекратить поиск
     # если нет ни одного повторения - вырезать и отправить лицо
     cur_face_locations = face2struct(cur_face_locations)
-    tracingFacesSimple(cur_face_locations, last_face_locations)
+    # cur_face_locations = tracingFacesSimple(cur_face_locations, last_face_locations)
 
     # текущий кадр становится прошлым
-    last_face_locations = cur_face_locations
+    # устаревание:
+    last_face_locations = makeFaceLocationsElder(cur_face_locations)
+    Qarg.put((frame, last_face_locations, kadrEmpty))
     return (frame, last_face_locations, kadrEmpty)
+"""
+
+def ThreadProcess(frame, QVideoFrames, QTracing, prevProc):
+    frame, cur_face_locations = detect(frame)
+    prevProc.join()
+    QVideoFrames.put(frame)
+    last_face_locations = QTracing.get()
+    cur_face_locations = tracingFacesSimple(cur_face_locations, last_face_locations, frame)
+    cur_face_locations = makeFaceLocationsElder(cur_face_locations)
+    QTracing.put(cur_face_locations)
 
 
+def multyThreadManager(QCameraFrames, QVideoFrames, QflagCont):
+    cont = True
+    prevProc = Thread()
+    prevProc.start()
+    QTracing = Queue()
+    QTracing.put([])
 
-def tracingToMultiThread(inArgs, res):
-    (frameLast, last_face_locations, kadrEmpty1) = inArgs
-    (frame, cur_face_locations, kadrEmpty2) = res
+    while cont:
 
-    ic(kadrEmpty2,kadrEmpty1)
-    if kadrEmpty2 - kadrEmpty1 == 1:
-        return
-    elif kadrEmpty2 - kadrEmpty1 < 0:
-        for newFace in cur_face_locations:
-            faceDetected(frame, newFace)
-    else: # kadrEmpty2 = kadrEmpty1 = 0
-        for newFace in cur_face_locations:
-            for oldFace in last_face_locations:
-                if differ(oldFace, newFace) < maxDistance:
-                    break
+        if not QflagCont.empty():
+            cont = QflagCont.get()
+        if not QCameraFrames.empty():
+            frame = QCameraFrames.get()
+            prevProc = Thread(target=ThreadProcess, args=(frame, QVideoFrames, QTracing, prevProc))
+            st = time()
+            prevProc.start()
+            print(f"manager time = {time()-st:.3f}")
+
+def camReader(QCameraFrames, video_capture, maxInAccessWebcam, QflagCont):
+    cont = True
+    inAccessWebcam = 0
+    while cont:
+        if not QflagCont.empty():
+            cont = QflagCont.get()
+
+        ret, frame = video_capture.read()
+
+        if not ret:
+            print("Video doesn't accepted!")
+            print(f"Address of webcam:  {cameraSource}")
+            if inAccessWebcam >= maxInAccessWebcam:
+                break
             else:
-                faceDetected(frame, newFace)
+                inAccessWebcam += 1
+                continue
+        else:
+            inAccessWebcam = 0
+            QCameraFrames.put(frame)
 
-def threadProcess(argList, func, inArgs, prev):
-    global countProc
-    res = func(inArgs)
-    if None != prev:
-        prev.join()
-    argList.put(res)
+def videoPlayer(QVideoframes, QflagCont):
+    cont = True
+    while cont:
+        if not QflagCont.empty():
+            cont = QflagCont.get()
+        if not QVideoframes.empty():
+            img = QVideoframes.get()
+        else:
+            continue
+
+        cv2.imshow("title", img)
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
+
 
 start = time()
 
@@ -189,27 +242,31 @@ if __name__ == "__main__":
     last_face_locations = []
     cur_face_locations = []
 
-    kadrEmpty = 0
-    frame = None
     faceCascade = CascadeClassifier('haarcascade_frontalface_default.xml')
     dnnFaceDetector = cnn_face_detection_model_v1("mmod_human_face_detector.dat")
     HOG_face_detect = get_frontal_face_detector()
 
+    QflagCont = Queue()
+    QCameraFrames = Queue()
+    QVideoFrames = Queue()
+
+
+    CamReader = Thread(target=camReader, args=(QCameraFrames, video_capture, maxInAccessWebcam, QflagCont))
+    MultyThreadManager = Thread(target=multyThreadManager, args=(QCameraFrames, QVideoFrames, QflagCont))
+    VideoPlayer = Thread(target=videoPlayer, args=(QVideoFrames, QflagCont))
+
+    VideoPlayer.start()
+    MultyThreadManager.start()
+    CamReader.start()
 
     while True:
-        if cv2.waitKey(1) & 0xFF == 27:
+        if not VideoPlayer.is_alive() \
+                or not CamReader.is_alive() \
+                or not MultyThreadManager.is_alive():
+            QflagCont.put(False)
+            QflagCont.put(False)
+            QflagCont.put(False)
             break
-        ret, frame = video_capture.read()
-        if not ret:
-            print("Video doesn't accepted!")
-            print(f"Address of webcam:  {cameraSource}")
-            break
-        else:
-            frame, last_face_locations, kadrEmpty = detect((frame, last_face_locations, kadrEmpty))
-            showImage('Video', frame)
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
-
 
 
     # закрываем видеопоток и окна
