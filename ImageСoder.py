@@ -23,3 +23,25 @@ def json2Image(data):
 
     f = Image.fromarray(res)
     return f
+
+def arrayImage2json(arrayImage):
+# перекодируем картинку в формат json
+    a = arrayImage
+    red = a[:, :, 0]
+    gre = a[:, :, 1]
+    blu = a[:, :, 2]
+
+    rpd = DataFrame(data=red)
+    gpd = DataFrame(data=gre)
+    bpd = DataFrame(data=blu)
+
+    rj = rpd.to_json()
+    gj = gpd.to_json()
+    bj = bpd.to_json()
+
+    data = {
+        "red": rj,
+        "green": gj,
+        "blue": bj
+    }
+    return data

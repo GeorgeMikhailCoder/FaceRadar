@@ -11,7 +11,13 @@ from icecream import ic
 from cv2 import CascadeClassifier
 from dlib import cnn_face_detection_model_v1
 from dlib import get_frontal_face_detector
+<<<<<<< Updated upstream
 
+=======
+from threading import Thread, Lock
+from queue import Queue
+from ExtendFunctions import *
+>>>>>>> Stashed changes
 
 print("start")
 # источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую
@@ -31,7 +37,7 @@ urlDist = "https://enazur7xr2301az.m.pipedream.net" # адрес Романа
 # лица, занимающие меньше X% по среднему арифметическому отношений ширины и высоты к экрану отсеиваются
 kMinFace = 0.01
 
-# количество пустых кадров, в течение которых прежние положения лиц будут храниться в памяти
+# количество кадров, в течение которых прежние положения лиц будут храниться в памяти
 maxKadrEmpty = 50
 
 # коэффициенты уменьшения масштабв входного изображения перед обработкой
@@ -42,6 +48,7 @@ ky = 0.5
 # максимальное расстояние между центрами лиц, при котором они считаются одним. Измеряется в долях по отношению к наибольшей стороне прямоугольника лица.
 maxDistance = 0.9
 
+<<<<<<< Updated upstream
 def differ(oldFace, newFace) -> float:
 # коэффициент разницы положений лиц, отношение расстояний между центрами к самой длинной стороне
     (top0, right0, bottom0, left0) = oldFace
@@ -82,6 +89,8 @@ def arrayImage2json(arrayImage):
     }
     return data
 
+=======
+>>>>>>> Stashed changes
 def upload(image, url):
 # отправляем картинку по указанному url
     # session = requests.Session()
@@ -98,25 +107,6 @@ def upload(image, url):
         remove(name)
     # session.close()
 
-def drawRect1(frame, face):
-# draw in order to face_recognition
-# Scale back up face locations since the frame we detected in was scaled to 1/4 size
-        (top, right, bottom, left) = face
-        top *= int(1/ky)
-        right *= int(1/kx)
-        bottom *= int(1/ky)
-        left *= int(1/kx)
-        # Draw a box around the face
-        cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-        return frame
-
-def koefSmall(face):
-    (top, right, bottom, left) = face
-    return 1 / 2 * ((bottom - top) / (camHeight * ky) + (right - left) / (camWidth * kx))
-
-def isTooSmall(face):
-    return koefSmall(face) < kMinFace
-
 def faceDetected(frame, newFace):
     print(f"new face detect! {newFace}")
     (top, right, bottom, left) = newFace
@@ -124,9 +114,10 @@ def faceDetected(frame, newFace):
     right *= int(1 / kx)
     bottom *= int(1 / ky)
     left *= int(1 / kx)
-    print(f"k = {koefSmall(newFace)}")
+    print(f"k = {koefSmall(newFace, kx, ky, camWidth, camHeight)}")
     imageToSend = frame[top:bottom, left:right]
     cv2.imshow("new face detect!", imageToSend)
+<<<<<<< Updated upstream
     upload(imageToSend, urlDist)
 
 def ltwh2trbl(ltwh):
@@ -138,6 +129,97 @@ def showImage(title, image):
     img = cv2.resize(image, (640, 480))
     cv2.imshow(title, img)
 
+=======
+    # upload(imageToSend, urlDist)
+    Thread(target=upload, args=(imageToSend, urlDist)).start()
+
+
+def tracingFacesSimple(cur_face_locations, last_face_locations):
+        for newFace in cur_face_locations:
+            for oldFace in last_face_locations:
+                if differ(oldFace["rect"], newFace["rect"]) < maxDistance:
+                    # найдено соответствие лица в прошлом
+                    oldFace["notInCam"] = 0
+                    break
+            else:
+                # не найдено ни одного соответствия лица
+                faceDetected(frame, newFace["rect"])
+
+        for oldFace in last_face_locations:
+            if 0 < oldFace["notInCam"] < maxKadrEmpty:
+                # сохраняем кадр в памяти
+                cur_face_locations.append(oldFace)
+
+        # устаревание:
+        for newFace in cur_face_locations:
+            newFace["notInCam"] += 1
+
+def detect(Qarg):
+    frame, last_face_locations, kadrEmpty = Qarg
+
+    # изменение размера, перевод картинки в формат rgb
+    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    rgb_small_frame = cv2.resize(frame, (0, 0), fx=kx, fy=ky)
+    # frame = rgb_small_frame
+
+    # определили положение лиц
+    cur_face_locations = chooseMethod(rgb_small_frame)
+    # заполнение массивов (для первого запуска)
+    if len(cur_face_locations) == 0:
+        kadrEmpty += 1
+        if kadrEmpty > maxKadrEmpty:
+            last_face_locations = []
+        return (frame, last_face_locations, kadrEmpty)
+    else:
+        kadrEmpty = 0
+
+    # отрисовка прямоугольников на экран
+    # сравнение размера прямоугольника с минимальным
+    for face in cur_face_locations:
+        if not isTooSmall(face, kMinFace, kx, ky, camWidth, camHeight):
+            frame = drawRect1(frame, face, kx, ky)
+        else:
+            cur_face_locations.remove(face)
+
+    # трекинг: поиск совпадений местонахождеий лиц а прошлом кадре
+    # если найдено повторение - прекратить поиск
+    # если нет ни одного повторения - вырезать и отправить лицо
+    cur_face_locations = face2struct(cur_face_locations)
+    tracingFacesSimple(cur_face_locations, last_face_locations)
+
+    # текущий кадр становится прошлым
+    last_face_locations = cur_face_locations
+    return (frame, last_face_locations, kadrEmpty)
+
+
+
+def tracingToMultiThread(inArgs, res):
+    (frameLast, last_face_locations, kadrEmpty1) = inArgs
+    (frame, cur_face_locations, kadrEmpty2) = res
+
+    ic(kadrEmpty2,kadrEmpty1)
+    if kadrEmpty2 - kadrEmpty1 == 1:
+        return
+    elif kadrEmpty2 - kadrEmpty1 < 0:
+        for newFace in cur_face_locations:
+            faceDetected(frame, newFace)
+    else: # kadrEmpty2 = kadrEmpty1 = 0
+        for newFace in cur_face_locations:
+            for oldFace in last_face_locations:
+                if differ(oldFace, newFace) < maxDistance:
+                    break
+            else:
+                faceDetected(frame, newFace)
+
+def threadProcess(argList, func, inArgs, prev):
+    global countProc
+    res = func(inArgs)
+    if None != prev:
+        prev.join()
+    argList.put(res)
+
+start = time()
+>>>>>>> Stashed changes
 # обработка консольных параметров, перезапись констант, если они были переданы
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
