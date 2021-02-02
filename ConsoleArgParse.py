@@ -28,8 +28,8 @@ def getConsoleArguments():
     maxInAccessWebcam = 1
 
     # коэффициенты уменьшения масштабв входного изображения перед обработкой
-    kx = 1
-    ky = 1
+    kx = 0.5
+    ky = 0.5
 
 
     parser = argparse.ArgumentParser()
