@@ -49,35 +49,6 @@ def showImage(title, image):
     cv2.imshow(title, img)
 
 
-def chooseMethod(rgb_small_frame):
-    # определение координат лиц (прямоугольников):
-
-    # подготовка моделей, в другой файл
-    # faceCascade = CascadeClassifier('haarcascade_frontalface_default.xml')
-    # dnnFaceDetector = cnn_face_detection_model_v1("mmod_human_face_detector.dat")
-    # HOG_face_detect = get_frontal_face_detector()
-
-
-    # через face_recognition
-    cur_face_locations = face_locations(rgb_small_frame)
-
-    # через каскады Хаара
-    # gray = cv2.cvtColor(rgb_small_frame, cv2.COLOR_RGB2GRAY)
-    # cur_face_locations = faceCascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=10, minSize=(int(kMinFace*camWidth), int(kMinFace*camHeight)), flags=cv2.CASCADE_SCALE_IMAGE)
-    # cur_face_locations = [(top, left + width, top + heigh, left) for (left, top, width, heigh) in cur_face_locations]
-
-    # через HOG
-    # gray = cv2.cvtColor(rgb_small_frame, cv2.COLOR_RGB2GRAY)
-    # cur_face_locations = HOG_face_detect(gray, 1)
-    # cur_face_locations = [(face.top(), face.right(), face.bottom(), face.left()) for face in cur_face_locations]
-
-    # через нейросеть dlib очень медленно
-    # gray = cv2.cvtColor(rgb_small_frame, cv2.COLOR_RGB2GRAY)
-    # cur_face_locations = dnnFaceDetector(gray, 1)
-    # cur_face_locations = [(face.rect.top(), face.rect.right(), face.rect.bottom(), face.rect.left())  for face in cur_face_locations]
-    return cur_face_locations
-
-
 def face2struct(rectFaces):
     return [
         {
@@ -92,3 +63,12 @@ def struct2face(structFaces):
         st["rect"]
         for st in structFaces
     ]
+
+def makeFaceLocationsElder(faceLocations, maxKadrEmpty):
+    for face in faceLocations:
+        face["notInCam"] += 1
+        if face["notInCam"] > maxKadrEmpty:
+            faceLocations.remove(face)
+            # удаляет первое вхождение face, одинаковых прямоугольников не бывает
+    return faceLocations
+
