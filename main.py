@@ -22,7 +22,7 @@ if __name__ == "__main__":
 
 
 
-    oneThreadDetection2(video_capture, Sargs)
+    oneThreadDetection(video_capture, Sargs)
     # manyThreadDetection(video_capture, Sargs)
     # закрываем видеопоток и окна
     video_capture.release()
