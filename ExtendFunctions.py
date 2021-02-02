@@ -48,8 +48,15 @@ def showImage(title, image):
     img = cv2.resize(image, (640, 480))
     cv2.imshow(title, img)
 
+
 def chooseMethod(rgb_small_frame):
     # определение координат лиц (прямоугольников):
+
+    # подготовка моделей, в другой файл
+    # faceCascade = CascadeClassifier('haarcascade_frontalface_default.xml')
+    # dnnFaceDetector = cnn_face_detection_model_v1("mmod_human_face_detector.dat")
+    # HOG_face_detect = get_frontal_face_detector()
+
 
     # через face_recognition
     cur_face_locations = face_locations(rgb_small_frame)

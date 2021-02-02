@@ -119,7 +119,7 @@ def detect(frame):
     # print(f"face rec: {t1 - t0:.3f}")
     # заполнение массивов (для первого запуска)
     if len(cur_face_locations) == 0:
-        cur_face_locations = makeFaceLocationsElder(last_face_locations)
+        cur_face_locations = []
         return (frame, cur_face_locations)
 
 
@@ -171,9 +171,9 @@ def multyThreadManager(QCameraFrames, QVideoFrames, QflagCont):
         if not QCameraFrames.empty():
             frame = QCameraFrames.get()
             prevProc = Thread(target=ThreadProcess, args=(frame, QVideoFrames, QTracing, prevProc))
-            st = time()
+            # st = time()
             prevProc.start()
-            print(f"manager time = {time()-st:.3f}")
+            # print(f"manager time = {time()-st:.3f}")
 
 def camReader(QCameraFrames, video_capture, maxInAccessWebcam, QflagCont):
     cont = True
@@ -210,8 +210,70 @@ def videoPlayer(QVideoframes, QflagCont):
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
+def manyThreadDetection(video_capture, maxInAccessWebcam):
+    QflagCont = Queue()
+    QCameraFrames = Queue()
+    QVideoFrames = Queue()
 
-start = time()
+    CamReader = Thread(target=camReader, args=(QCameraFrames, video_capture, maxInAccessWebcam, QflagCont))
+    MultyThreadManager = Thread(target=multyThreadManager, args=(QCameraFrames, QVideoFrames, QflagCont))
+    VideoPlayer = Thread(target=videoPlayer, args=(QVideoFrames, QflagCont))
+
+    VideoPlayer.start()
+    MultyThreadManager.start()
+    CamReader.start()
+
+    while True:
+        if not VideoPlayer.is_alive() \
+                or not CamReader.is_alive() \
+                or not MultyThreadManager.is_alive():
+            QflagCont.put(False)
+            QflagCont.put(False)
+            QflagCont.put(False)
+            break
+
+def oneThreadDetection(video_capture, maxInAccessWebcam):
+    last_face_locations = []
+    kadrToProcess = 100
+    curKadr = 0
+    while True:
+        ret, frame = video_capture.read()
+
+        curKadr+=1
+        if curKadr%kadrToProcess==0:
+            if not ret:
+                print("Video doesn't accepted!")
+                print(f"Address of webcam:  {cameraSource}")
+                if inAccessWebcam >= maxInAccessWebcam:
+                    break
+                else:
+                    inAccessWebcam += 1
+                    continue
+            else:
+                inAccessWebcam = 0
+                frame, cur_face_locations = detect(frame)
+                tracingFacesSimple(cur_face_locations, last_face_locations, frame)
+                last_face_locations = makeFaceLocationsElder(cur_face_locations)
+
+        cv2.imshow("title", frame)
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
+
+
+def justToPlay(video_capture, maxInAccessWebcam):
+    QFrames = Queue()
+    QflagCont = Queue()
+    CamReader = Thread(target=camReader, args=(QFrames, video_capture, maxInAccessWebcam, QflagCont))
+    VideoPlayer = Thread(target=videoPlayer, args=(QFrames, QflagCont))
+    CamReader.start()
+    VideoPlayer.start()
+
+    while True:
+        if not VideoPlayer.is_alive() \
+                or not CamReader.is_alive():
+            QflagCont.put(False)
+            QflagCont.put(False)
+            break
 
 # обработка консольных параметров, перезапись констант, если они были переданы
 if __name__ == "__main__":
@@ -239,36 +301,8 @@ if __name__ == "__main__":
     camHeight = video_capture.get(4)
     print(f"camWidth = {camWidth}, camHeigh = {camHeight}")
 
-    last_face_locations = []
-    cur_face_locations = []
-
-    faceCascade = CascadeClassifier('haarcascade_frontalface_default.xml')
-    dnnFaceDetector = cnn_face_detection_model_v1("mmod_human_face_detector.dat")
-    HOG_face_detect = get_frontal_face_detector()
-
-    QflagCont = Queue()
-    QCameraFrames = Queue()
-    QVideoFrames = Queue()
-
-
-    CamReader = Thread(target=camReader, args=(QCameraFrames, video_capture, maxInAccessWebcam, QflagCont))
-    MultyThreadManager = Thread(target=multyThreadManager, args=(QCameraFrames, QVideoFrames, QflagCont))
-    VideoPlayer = Thread(target=videoPlayer, args=(QVideoFrames, QflagCont))
-
-    VideoPlayer.start()
-    MultyThreadManager.start()
-    CamReader.start()
-
-    while True:
-        if not VideoPlayer.is_alive() \
-                or not CamReader.is_alive() \
-                or not MultyThreadManager.is_alive():
-            QflagCont.put(False)
-            QflagCont.put(False)
-            QflagCont.put(False)
-            break
-
-
+    # manyThreadDetection(video_capture, maxInAccessWebcam)
+    oneThreadDetection(video_capture, maxInAccessWebcam)
     # закрываем видеопоток и окна
     video_capture.release()
     cv2.destroyAllWindows()
