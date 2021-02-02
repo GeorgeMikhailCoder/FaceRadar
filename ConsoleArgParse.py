@@ -21,6 +21,9 @@ def getConsoleArguments():
     # максимальное расстояние между центрами лиц, при котором они считаются одним. Измеряется в долях по отношению к наибольшей стороне прямоугольника лица.
     maxDistance = 0.9
 
+    # частота обработки кадров: количество кадров, которые будут пропущены между обрабатываемыми кадрами. Напрямую влияет на производитедбность.
+    kadrToProcess = 100
+
     # количество кадров, в течение которых прежние положения лиц будут храниться в памяти
     maxKadrEmpty = 50
 
@@ -37,6 +40,7 @@ def getConsoleArguments():
     parser.add_argument('-ud', '--urlDist', default=urlDist)
     parser.add_argument('-kf', '--kMinFace', default=kMinFace)
     parser.add_argument('-md', '--maxDistance', default=maxDistance)
+    parser.add_argument('-kp', '--kadrToProcess', default=kadrToProcess)
     parser.add_argument('-ke','--maxKadrEmpty', default=maxKadrEmpty)
     parser.add_argument('-iw', '--maxInAccessWebcam', default=maxInAccessWebcam)
     parser.add_argument('-kx', default=kx)
@@ -48,6 +52,7 @@ def getConsoleArguments():
     urlDist = namespace.urlDist
     kMinFace = float(namespace.kMinFace)
     maxDistance = float(namespace.maxDistance)
+    kadrToProcess = int(namespace.kadrToProcess)
     maxKadrEmpty = int(namespace.maxKadrEmpty)
     maxInAccessWebcam = int(namespace.maxInAccessWebcam)
     kx = float(namespace.kx)
@@ -58,6 +63,7 @@ def getConsoleArguments():
         "urlDist": urlDist,
         "kMinFace": kMinFace,
         "maxDistance": maxDistance,
+        "kadrToProcess": kadrToProcess,
         "maxKadrEmpty": maxKadrEmpty,
         "maxInAccessWebcam": maxInAccessWebcam,
         "kx": kx,

@@ -227,8 +227,8 @@ def manyThreadDetection(video_capture, Sargs):
 def oneThreadDetection(video_capture, Sargs):
     cameraSource = Sargs["cameraSource"]
     maxInAccessWebcam = Sargs["maxInAccessWebcam"]
+    kadrToProcess = Sargs["kadrToProcess"]
     last_face_locations = []
-    kadrToProcess = 100
     curKadr = 0
     while True:
         ret, frame = video_capture.read()
