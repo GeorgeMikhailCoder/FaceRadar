@@ -7,6 +7,7 @@ from os import remove
 from time import sleep, time
 from threading import Thread, Lock
 from queue import Queue
+from os import getcwd
 
 
 def chooseMethod(rgb_small_frame, Sargs):
@@ -51,7 +52,7 @@ def upload(image, url):
 # отправляем картинку по указанному url
     # session = requests.Session()
     # data = arrayImage2json(image)
-    name = "/var/tmp/screen"+time().__str__()+".jpg"
+    name = getcwd()+"/var/tmp/screen"+time().__str__()+".jpg"
     cv2.imwrite(name, image)
     file = open(name, 'rb')
     try:
@@ -60,7 +61,7 @@ def upload(image, url):
         print("Error in connection to server")
     finally:
         file.close()
-        remove(name)
+        # remove(name)
     # session.close()
 
 def faceDetected(frame, newFace, Sargs):
