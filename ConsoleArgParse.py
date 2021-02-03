@@ -7,8 +7,8 @@ def getConsoleArguments():
     # cameraSource = 0 # работает, локальная камера
     # cameraSource = 'http://homecam:15243@192.168.43.1:8080/video' # работает, ip webcam, локальная сеть
     # cameraSource = "rtsp://op1:Qw123456@109.194.108.56:1554/ISAPI/Streaming/Channels/101" # первая камера: парковка
-    cameraSource = "rtsp://op1:Qw123456@109.194.108.56:2554/ISAPI/Streaming/Channels/101" # вторая камера: офис
-    # cameraSource = 0
+    # cameraSource = "rtsp://op1:Qw123456@109.194.108.56:2554/ISAPI/Streaming/Channels/101" # вторая камера: офис
+    cameraSource = 0
 
     # адрес назначения, для отправления найденных лиц
     urlDist = "http://127.0.0.1:8000"

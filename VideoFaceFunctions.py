@@ -77,7 +77,7 @@ def faceDetected(frame, newFace, Sargs):
     left *= int(1 / kx)
     print(f"k = {koefSmall(newFace, kx, ky, camWidth, camHeight)}")
     imageToSend = frame[top:bottom, left:right]
-    cv2.imshow("new face detect!", imageToSend)
+    # cv2.imshow("new face detect!", imageToSend)
     # upload(imageToSend, urlDist)
     Thread(target=upload, args=(imageToSend, urlDist)).start()
 
@@ -249,7 +249,7 @@ def oneThreadDetection(video_capture, Sargs):
                 tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs)
                 last_face_locations = makeFaceLocationsElder(cur_face_locations, Sargs["maxKadrEmpty"])
 
-        cv2.imshow("title", frame)
+        # cv2.imshow("title", frame)
         if cv2.waitKey(1) & 0xFF == 27:
             break
 

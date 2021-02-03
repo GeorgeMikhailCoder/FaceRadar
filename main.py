@@ -11,6 +11,7 @@ if __name__ == "__main__":
     Sargs = getConsoleArguments()
     print("start")
     print(f" launched with params: \n {Sargs}")
+    print("Press Ctrl+C to stop this server in console")
     video_capture = cameraCapture(Sargs["cameraSource"])
     camWidth = video_capture.get(3)
     camHeight = video_capture.get(4)
