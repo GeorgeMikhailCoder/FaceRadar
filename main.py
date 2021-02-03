@@ -24,6 +24,8 @@ if __name__ == "__main__":
 
     oneThreadDetection(video_capture, Sargs)
     # manyThreadDetection(video_capture, Sargs)
+    # wheelThreadsDetection(video_capture, Sargs)
+
     # закрываем видеопоток и окна
     video_capture.release()
     cv2.destroyAllWindows()
