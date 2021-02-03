@@ -51,7 +51,7 @@ def upload(image, url):
 # отправляем картинку по указанному url
     # session = requests.Session()
     # data = arrayImage2json(image)
-    name = "screen"+time().__str__()+".jpg"
+    name = "/var/tmp/screen"+time().__str__()+".jpg"
     cv2.imwrite(name, image)
     file = open(name, 'rb')
     try:
