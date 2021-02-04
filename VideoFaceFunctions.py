@@ -61,7 +61,7 @@ def upload(image, url):
         print("Error in connection to server")
     finally:
         file.close()
-        # remove(name)
+        remove(name)
     # session.close()
 
 def faceDetected(frame, newFace, Sargs):
