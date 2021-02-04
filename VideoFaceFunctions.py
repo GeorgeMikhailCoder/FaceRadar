@@ -8,7 +8,7 @@ from time import sleep, time
 from threading import Thread, Lock
 from queue import Queue
 from os import getcwd
-
+from datetime import datetime
 
 def chooseMethod(rgb_small_frame, Sargs):
     # определение координат лиц (прямоугольников)
@@ -229,6 +229,7 @@ def oneThreadDetection(video_capture, Sargs):
     cameraSource = Sargs["cameraSource"]
     maxInAccessWebcam = Sargs["maxInAccessWebcam"]
     kadrToProcess = Sargs["kadrToProcess"]
+    cameraTimeOut = Sargs["cameraTimeOut"]
     last_face_locations = []
     curKadr = 0
     while True:
@@ -240,7 +241,11 @@ def oneThreadDetection(video_capture, Sargs):
                 print("Video doesn't accepted!")
                 print(f"Address of webcam:  {cameraSource}")
                 if inAccessWebcam >= maxInAccessWebcam:
-                    break
+                    print("fail to reconnect")
+                    sleep(cameraTimeOut)
+                    now = datetime.now()
+                    print(f"try to reconnect, {now.time().__str__()[:8]}")
+                    continue
                 else:
                     inAccessWebcam += 1
                     continue
@@ -254,7 +259,7 @@ def oneThreadDetection(video_capture, Sargs):
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
-
+"""
 def threadOfDetect(QFaces, frame, Sargs):
     if QFaces.empty():
         last_face_locations = []
@@ -265,10 +270,12 @@ def threadOfDetect(QFaces, frame, Sargs):
     last_face_locations = makeFaceLocationsElder(cur_face_locations, Sargs["maxKadrEmpty"])
     QFaces.put(last_face_locations)
 
+
+
 def oneThreadDetection2(video_capture, Sargs):
     cameraSource = Sargs["cameraSource"]
     maxInAccessWebcam = Sargs["maxInAccessWebcam"]
-    cameraTimeOut = Sargs["cameraTimeOut"]
+
     last_face_locations = []
     kadrToProcess = 100
     curKadr = 0
@@ -284,7 +291,10 @@ def oneThreadDetection2(video_capture, Sargs):
                 if maxInAccessWebcam == -1:
                     continue
                 if inAccessWebcam >= maxInAccessWebcam:
+                    print("fail to reconnect")
                     sleep(cameraTimeOut)
+                    now = datetime.now()
+                    print(f"try to reconnect, {now.time().__str__()[:8]}")
                     continue
                 else:
                     inAccessWebcam += 1
@@ -295,7 +305,7 @@ def oneThreadDetection2(video_capture, Sargs):
         cv2.imshow("title", frame)
         if cv2.waitKey(1) & 0xFF == 27:
             break
-
+"""
 def justToPlay(video_capture, Sargs):
     QFrames = Queue()
     QflagCont = Queue()
