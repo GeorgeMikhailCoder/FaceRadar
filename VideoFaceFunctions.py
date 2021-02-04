@@ -280,6 +280,8 @@ def oneThreadDetection2(video_capture, Sargs):
             if not ret:
                 print("Video doesn't accepted!")
                 print(f"Address of webcam:  {cameraSource}")
+                if maxInAccessWebcam == -1:
+                    continue
                 if inAccessWebcam >= maxInAccessWebcam:
                     break
                 else:
