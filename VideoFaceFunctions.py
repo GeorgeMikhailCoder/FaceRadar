@@ -242,6 +242,7 @@ def oneThreadDetection(video_capture, Sargs):
                 print(f"Address of webcam:  {cameraSource}")
                 if inAccessWebcam >= maxInAccessWebcam:
                     print("fail to reconnect")
+                    print(f"next try to reconnect in {cameraTimeOut} seconds")
                     sleep(cameraTimeOut)
                     now = datetime.now()
                     print(f"try to reconnect, {now.time().__str__()[:8]}")
