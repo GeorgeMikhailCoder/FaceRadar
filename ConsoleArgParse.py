@@ -27,8 +27,11 @@ def getConsoleArguments():
     # количество кадров, в течение которых прежние положения лиц будут храниться в памяти
     maxKadrEmpty = 50
 
-    # количество непринятых кадров до завершения программы
+    # количество непринятых кадров до перевода программы в режим простоя/ожидания
     maxInAccessWebcam = 1
+
+    # время простоя между попытками восстановить связь с камерой, в секундах
+    cameraTimeOut = 600
 
     # коэффициенты уменьшения масштабв входного изображения перед обработкой
     kx = 0.5
@@ -43,6 +46,7 @@ def getConsoleArguments():
     parser.add_argument('-kp', '--kadrToProcess', default=kadrToProcess)
     parser.add_argument('-ke','--maxKadrEmpty', default=maxKadrEmpty)
     parser.add_argument('-iw', '--maxInAccessWebcam', default=maxInAccessWebcam)
+    parser.add_argument('-ct', '--cameraTimeOut', default=cameraTimeOut)
     parser.add_argument('-kx', default=kx)
     parser.add_argument('-ky', default=ky)
 
@@ -55,6 +59,7 @@ def getConsoleArguments():
     kadrToProcess = int(namespace.kadrToProcess)
     maxKadrEmpty = int(namespace.maxKadrEmpty)
     maxInAccessWebcam = int(namespace.maxInAccessWebcam)
+    cameraTimeOut = int(namespace.cameraTimeOut)
     kx = float(namespace.kx)
     ky = float(namespace.ky)
 
@@ -66,6 +71,7 @@ def getConsoleArguments():
         "kadrToProcess": kadrToProcess,
         "maxKadrEmpty": maxKadrEmpty,
         "maxInAccessWebcam": maxInAccessWebcam,
+        "cameraTimeOut": cameraTimeOut,
         "kx": kx,
         "ky": ky
     }

@@ -268,6 +268,7 @@ def threadOfDetect(QFaces, frame, Sargs):
 def oneThreadDetection2(video_capture, Sargs):
     cameraSource = Sargs["cameraSource"]
     maxInAccessWebcam = Sargs["maxInAccessWebcam"]
+    cameraTimeOut = Sargs["cameraTimeOut"]
     last_face_locations = []
     kadrToProcess = 100
     curKadr = 0
@@ -283,7 +284,8 @@ def oneThreadDetection2(video_capture, Sargs):
                 if maxInAccessWebcam == -1:
                     continue
                 if inAccessWebcam >= maxInAccessWebcam:
-                    break
+                    sleep(cameraTimeOut)
+                    continue
                 else:
                     inAccessWebcam += 1
                     continue
