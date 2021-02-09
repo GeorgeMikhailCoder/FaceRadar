@@ -10,6 +10,8 @@ from queue import Queue
 from os import getcwd
 from datetime import datetime
 
+## функции обнаружения
+
 def chooseMethod(rgb_small_frame, Sargs):
     # определение координат лиц (прямоугольников)
     kMinFace = Sargs["kMinFace"]
@@ -82,7 +84,6 @@ def faceDetected(frame, newFace, Sargs):
     # upload(imageToSend, urlDist)
     Thread(target=upload, args=(imageToSend, urlDist)).start()
 
-
 def tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs):
     maxDistance = Sargs["maxDistance"]
     maxKadrEmpty = Sargs["maxKadrEmpty"]
@@ -138,33 +139,8 @@ def detect(frame, Sargs):
     cur_face_locations = face2struct(cur_face_locations)
     return (frame, cur_face_locations)
 
-def ThreadProcess(frame, QVideoFrames, QTracing, prevProc, Sargs):
-    frame, cur_face_locations = detect(frame, Sargs)
-    prevProc.join()
-    QVideoFrames.put(frame)
-    last_face_locations = QTracing.get()
-    cur_face_locations = tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs)
-    cur_face_locations = makeFaceLocationsElder(cur_face_locations, Sargs["maxKadrEmpty"])
-    QTracing.put(cur_face_locations)
 
-
-def multyThreadManager(QCameraFrames, QVideoFrames, Sargs, QflagCont):
-    cont = True
-    prevProc = Thread()
-    prevProc.start()
-    QTracing = Queue()
-    QTracing.put([])
-
-    while cont:
-
-        if not QflagCont.empty():
-            cont = QflagCont.get()
-        if not QCameraFrames.empty():
-            frame = QCameraFrames.get()
-            prevProc = Thread(target=ThreadProcess, args=(frame, QVideoFrames, QTracing, prevProc, Sargs))
-            # st = time()
-            prevProc.start()
-            # print(f"manager time = {time()-st:.3f}")
+## функции камеры
 
 def camReader(QCameraFrames, video_capture, Sargs, QflagCont):
     cameraSource = Sargs["cameraSource"]
@@ -203,27 +179,23 @@ def videoPlayer(QVideoframes, QflagCont):
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
-def manyThreadDetection(video_capture, Sargs):
+def justToPlay(video_capture, Sargs):
+    QFrames = Queue()
     QflagCont = Queue()
-    QCameraFrames = Queue()
-    QVideoFrames = Queue()
-
-    CamReader = Thread(target=camReader, args=(QCameraFrames, video_capture, Sargs, QflagCont))
-    MultyThreadManager = Thread(target=multyThreadManager, args=(QCameraFrames, QVideoFrames, Sargs, QflagCont))
-    VideoPlayer = Thread(target=videoPlayer, args=(QVideoFrames, QflagCont))
-
-    VideoPlayer.start()
-    MultyThreadManager.start()
+    CamReader = Thread(target=camReader, args=(QFrames, video_capture, Sargs, QflagCont))
+    VideoPlayer = Thread(target=videoPlayer, args=(QFrames, QflagCont))
     CamReader.start()
+    VideoPlayer.start()
 
     while True:
         if not VideoPlayer.is_alive() \
-                or not CamReader.is_alive() \
-                or not MultyThreadManager.is_alive():
-            QflagCont.put(False)
+                or not CamReader.is_alive():
             QflagCont.put(False)
             QflagCont.put(False)
             break
+
+
+## однопоточный рабочий вариант
 
 def oneThreadDetection(video_capture, Sargs):
     cameraSource = Sargs["cameraSource"]
@@ -260,7 +232,59 @@ def oneThreadDetection(video_capture, Sargs):
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
-"""
+## многопоточный вариант 1 - медленно
+
+def ThreadProcess(frame, QVideoFrames, QTracing, prevProc, Sargs):
+    frame, cur_face_locations = detect(frame, Sargs)
+    prevProc.join()
+    QVideoFrames.put(frame)
+    last_face_locations = QTracing.get()
+    cur_face_locations = tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs)
+    cur_face_locations = makeFaceLocationsElder(cur_face_locations, Sargs["maxKadrEmpty"])
+    QTracing.put(cur_face_locations)
+
+def multyThreadManager(QCameraFrames, QVideoFrames, Sargs, QflagCont):
+    cont = True
+    prevProc = Thread()
+    prevProc.start()
+    QTracing = Queue()
+    QTracing.put([])
+
+    while cont:
+
+        if not QflagCont.empty():
+            cont = QflagCont.get()
+        if not QCameraFrames.empty():
+            frame = QCameraFrames.get()
+            prevProc = Thread(target=ThreadProcess, args=(frame, QVideoFrames, QTracing, prevProc, Sargs))
+            # st = time()
+            prevProc.start()
+            # print(f"manager time = {time()-st:.3f}")
+
+def manyThreadDetection(video_capture, Sargs):
+    QflagCont = Queue()
+    QCameraFrames = Queue()
+    QVideoFrames = Queue()
+
+    CamReader = Thread(target=camReader, args=(QCameraFrames, video_capture, Sargs, QflagCont))
+    MultyThreadManager = Thread(target=multyThreadManager, args=(QCameraFrames, QVideoFrames, Sargs, QflagCont))
+    VideoPlayer = Thread(target=videoPlayer, args=(QVideoFrames, QflagCont))
+
+    VideoPlayer.start()
+    MultyThreadManager.start()
+    CamReader.start()
+
+    while True:
+        if not VideoPlayer.is_alive() \
+                or not CamReader.is_alive() \
+                or not MultyThreadManager.is_alive():
+            QflagCont.put(False)
+            QflagCont.put(False)
+            QflagCont.put(False)
+            break
+
+## однопоточное обнаружение в отдельном потоке - медленно
+
 def threadOfDetect(QFaces, frame, Sargs):
     if QFaces.empty():
         last_face_locations = []
@@ -270,8 +294,6 @@ def threadOfDetect(QFaces, frame, Sargs):
     tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs)
     last_face_locations = makeFaceLocationsElder(cur_face_locations, Sargs["maxKadrEmpty"])
     QFaces.put(last_face_locations)
-
-
 
 def oneThreadDetection2(video_capture, Sargs):
     cameraSource = Sargs["cameraSource"]
@@ -306,18 +328,5 @@ def oneThreadDetection2(video_capture, Sargs):
         cv2.imshow("title", frame)
         if cv2.waitKey(1) & 0xFF == 27:
             break
-"""
-def justToPlay(video_capture, Sargs):
-    QFrames = Queue()
-    QflagCont = Queue()
-    CamReader = Thread(target=camReader, args=(QFrames, video_capture, Sargs, QflagCont))
-    VideoPlayer = Thread(target=videoPlayer, args=(QFrames, QflagCont))
-    CamReader.start()
-    VideoPlayer.start()
 
-    while True:
-        if not VideoPlayer.is_alive() \
-                or not CamReader.is_alive():
-            QflagCont.put(False)
-            QflagCont.put(False)
-            break
+
