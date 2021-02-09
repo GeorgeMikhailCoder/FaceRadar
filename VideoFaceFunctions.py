@@ -66,6 +66,44 @@ def upload(image, url):
         remove(name)
     # session.close()
 
+def recUploadID(image, url):
+    import face_recognition
+    # отправляем картинку по указанному url
+    # session = requests.Session()
+    # data = arrayImage2json(image)
+    name = getcwd()+"/var/tmp/screen"+time().__str__()+".jpg"
+    cv2.imshow("title", image)
+    cv2.imwrite(name, image)
+
+    knImg = face_recognition.load_image_file("3х4.jpg")
+    image = face_recognition.load_image_file(name)
+    knEnc = face_recognition.face_encodings(knImg)[0]
+    try:
+        enc = face_recognition.face_encodings(image)[0]
+        flag = face_recognition.compare_faces([knEnc], enc)
+        if flag:
+            msg = "Знакомое лицо"
+        else:
+            msg = "Новое лицо"
+
+    except Exception:
+        msg = "не удалось распознать лицо"
+
+    file = open(name, 'rb')
+    print(msg)
+    try:
+        r = post(url, data=msg)
+    except Exception:
+        print("Error in connection to server")
+    finally:
+        file.close()
+        remove(name)
+    while True:
+        cv2.imshow("title", image)
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
+    # session.close()
+
 def faceDetected(frame, newFace, Sargs):
     kx = Sargs["kx"]
     ky = Sargs["ky"]
@@ -82,7 +120,7 @@ def faceDetected(frame, newFace, Sargs):
     imageToSend = frame[top:bottom, left:right]
     # cv2.imshow("new face detect!", imageToSend)
     # upload(imageToSend, urlDist)
-    Thread(target=upload, args=(imageToSend, urlDist)).start()
+    Thread(target=recUploadID, args=(imageToSend, urlDist)).start()
 
 def tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs):
     maxDistance = Sargs["maxDistance"]
