@@ -65,10 +65,10 @@ def upload(image, url):
         file.close()
         remove(name)
 
-    while True:
-        cv2.imshow("title", image)
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
+    # while True:
+    #     cv2.imshow("title", image)
+    #     if cv2.waitKey(1) & 0xFF == 27:
+    #         break
     # session.close()
 
 def recUploadID(image, url):
