@@ -3,11 +3,10 @@ import cv2
 from face_recognition import face_locations
 from dlib import get_frontal_face_detector, cnn_face_detection_model_v1
 from requests import post
-from os import remove
+from os import remove, getcwd
 from time import sleep, time
 from threading import Thread, Lock
 from queue import Queue
-from os import getcwd
 from datetime import datetime
 
 ## функции обнаружения
@@ -57,13 +56,19 @@ def upload(image, url):
     name = getcwd()+"/var/tmp/screen"+time().__str__()+".jpg"
     cv2.imwrite(name, image)
     file = open(name, 'rb')
+
     try:
-        r = post(url, files={name: file})
+        r = post(url, files={"face": file})
     except Exception:
         print("Error in connection to server")
     finally:
         file.close()
         remove(name)
+
+    while True:
+        cv2.imshow("title", image)
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
     # session.close()
 
 def recUploadID(image, url):
@@ -120,7 +125,7 @@ def faceDetected(frame, newFace, Sargs):
     imageToSend = frame[top:bottom, left:right]
     # cv2.imshow("new face detect!", imageToSend)
     # upload(imageToSend, urlDist)
-    Thread(target=recUploadID, args=(imageToSend, urlDist)).start()
+    Thread(target=upload, args=(imageToSend, urlDist)).start()
 
 def tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs):
     maxDistance = Sargs["maxDistance"]
