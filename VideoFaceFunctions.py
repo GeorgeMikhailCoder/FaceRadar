@@ -49,7 +49,7 @@ def cameraCapture(cameraSource):
         video_capture = cv2.VideoCapture(cameraSource)
     return video_capture
 
-def upload(image, url):
+def upload(image, data, url):
 # отправляем картинку по указанному url
     # session = requests.Session()
     # data = arrayImage2json(image)
@@ -58,17 +58,17 @@ def upload(image, url):
     file = open(name, 'rb')
 
     try:
-        r = post(url, files={"face": file})
+        r = post(url, data=data, files={"face": file})
     except Exception:
         print("Error in connection to server")
     finally:
         file.close()
         remove(name)
 
-    # while True:
-    #     cv2.imshow("title", image)
-    #     if cv2.waitKey(1) & 0xFF == 27:
-    #         break
+    while True:
+        cv2.imshow("title", image)
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
     # session.close()
 
 def recUploadID(image, url):
@@ -125,7 +125,8 @@ def faceDetected(frame, newFace, Sargs):
     imageToSend = frame[top:bottom, left:right]
     # cv2.imshow("new face detect!", imageToSend)
     # upload(imageToSend, urlDist)
-    Thread(target=upload, args=(imageToSend, urlDist)).start()
+    dataToSend = {"idSource": Sargs["idSource"]}
+    Thread(target=upload, args=(imageToSend, dataToSend, urlDist)).start()
 
 def tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs):
     maxDistance = Sargs["maxDistance"]
@@ -246,6 +247,7 @@ def oneThreadDetection(video_capture, Sargs):
     kadrToProcess = Sargs["kadrToProcess"]
     cameraTimeOut = Sargs["cameraTimeOut"]
     last_face_locations = []
+    inAccessWebcam = 0
     curKadr = 0
     while True:
         ret, frame = video_capture.read()
