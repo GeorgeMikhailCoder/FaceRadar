@@ -65,10 +65,10 @@ def upload(image, data, url):
         file.close()
         remove(name)
 
-    while True:
-        cv2.imshow("title", image)
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
+    # while True:
+    #     cv2.imshow("title", image)
+    #     if cv2.waitKey(1) & 0xFF == 27:
+    #         break
     # session.close()
 
 def recUploadID(image, url):
@@ -77,7 +77,7 @@ def recUploadID(image, url):
     # session = requests.Session()
     # data = arrayImage2json(image)
     name = getcwd()+"/var/tmp/screen"+time().__str__()+".jpg"
-    cv2.imshow("title", image)
+    # cv2.imshow("title", image)
     cv2.imwrite(name, image)
 
     knImg = face_recognition.load_image_file("3х4.jpg")
@@ -103,10 +103,10 @@ def recUploadID(image, url):
     finally:
         file.close()
         remove(name)
-    while True:
-        cv2.imshow("title", image)
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
+    # while True:
+    #     cv2.imshow("title", image)
+    #     if cv2.waitKey(1) & 0xFF == 27:
+    #         break
     # session.close()
 
 def faceDetected(frame, newFace, Sargs):
@@ -274,8 +274,8 @@ def oneThreadDetection(video_capture, Sargs):
                 last_face_locations = makeFaceLocationsElder(cur_face_locations, Sargs["maxKadrEmpty"])
 
         # cv2.imshow("title", frame)
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
+        # if cv2.waitKey(1) & 0xFF == 27:
+        #     break
 
 ## многопоточный вариант 1 - медленно
 
@@ -370,8 +370,8 @@ def oneThreadDetection2(video_capture, Sargs):
             else:
                 inAccessWebcam = 0
                 Thread(target=threadOfDetect, args=(QFaces, frame, Sargs)).start()
-        cv2.imshow("title", frame)
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
+        # cv2.imshow("title", frame)
+        # if cv2.waitKey(1) & 0xFF == 27:
+        #     break
 
 
