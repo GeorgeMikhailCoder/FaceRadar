@@ -1,21 +1,20 @@
 from ExtendFunctions import *
 import cv2
 from face_recognition import face_locations
-from dlib import get_frontal_face_detector, cnn_face_detection_model_v1
 from requests import post
 from os import remove, getcwd
 from time import sleep, time
-from threading import Thread, Lock
-from queue import Queue
+from threading import Thread
 from datetime import datetime
+import logging.config
 
 ## функции обнаружения
 
 def chooseMethod(rgb_small_frame, Sargs):
     # определение координат лиц (прямоугольников)
-    kMinFace = Sargs["kMinFace"]
-    camWidth = Sargs["camWidth"]
-    camHeight = Sargs["camHeight"]
+    # kMinFace = Sargs["kMinFace"]
+    # camWidth = Sargs["camWidth"]
+    # camHeight = Sargs["camHeight"]
 
     # подготовка моделей, в другой файл
     # faceCascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -43,16 +42,56 @@ def chooseMethod(rgb_small_frame, Sargs):
     return cur_face_locations
 
 def cameraCapture(cameraSource):
-    if type(cameraSource) == str and cameraSource[0:4] == "rtsp": # for rtsp
-        video_capture = cv2.VideoCapture(cameraSource, cv2.CAP_FFMPEG)
-    else:
-        video_capture = cv2.VideoCapture(cameraSource)
+    try:
+        if type(cameraSource) == str and cameraSource[0:4] == "rtsp": # for rtsp
+            video_capture = cv2.VideoCapture(cameraSource, cv2.CAP_FFMPEG)
+        else:
+            video_capture = cv2.VideoCapture(cameraSource)
+    except Exception:
+        logger = logging.getLogger("main_logger.VideoFaceFunctions.cameraCapture")
+        logger.error("Error while connecting to camera")
+        logger.error(Exception.__str__())
+    return video_capture
+
+def cameraReconnect(video_capture, Sargs):
+    cameraSource = Sargs["cameraSource"]
+    maxInAccessWebcam = Sargs["maxInAccessWebcam"]
+    cameraTimeOut = Sargs["cameraTimeOut"]
+    logger = logging.getLogger("main_logger.VideoFaceFunctions.cameraReconnect")
+    logger.error(f"Video doesn't accepted, address of webcam:  {cameraSource}")
+    inAccessWebcam = 1
+    while True:
+        if inAccessWebcam >= maxInAccessWebcam:
+            try:
+                logger.error(f"Fail to reconnect, next try to reconnect in {cameraTimeOut} seconds")
+                video_capture.release()
+                sleep(cameraTimeOut)
+                now = datetime.now()
+                logger.error(f"Try to reconnect, {now.time().__str__()[:8]}")
+                video_capture = cameraCapture(Sargs["cameraSource"])
+            except Exception:
+                logger.error(Exception.__str__())
+        else:
+            try:
+                video_capture.release()
+                video_capture = cameraCapture(Sargs["cameraSource"])
+            except Exception:
+                logger.error(Exception.__str__())
+
+        camWidth = video_capture.get(3)
+        if camWidth < 0.1:
+            logger.error(f"Video doesn't accepted, address of webcam:  {cameraSource}")
+            inAccessWebcam += 1
+        else:
+            logger.info(f"Connection recieved")
+            break
     return video_capture
 
 def upload(image, data, url):
 # отправляем картинку по указанному url
     # session = requests.Session()
     # data = arrayImage2json(image)
+
     name = getcwd()+"/var/tmp/screen"+time().__str__()+".jpg"
     cv2.imwrite(name, image)
     file = open(name, 'rb')
@@ -60,7 +99,8 @@ def upload(image, data, url):
     try:
         r = post(url, data=data, files={"face": file})
     except Exception:
-        print("Error in connection to server")
+        logger = logging.getLogger("main_logger.VideoFaceFunctions.faceDetected")
+        logger.error(f"Error in connection to server, url = {url}")
     finally:
         file.close()
         remove(name)
@@ -71,57 +111,21 @@ def upload(image, data, url):
     #         break
     # session.close()
 
-def recUploadID(image, url):
-    import face_recognition
-    # отправляем картинку по указанному url
-    # session = requests.Session()
-    # data = arrayImage2json(image)
-    name = getcwd()+"/var/tmp/screen"+time().__str__()+".jpg"
-    # cv2.imshow("title", image)
-    cv2.imwrite(name, image)
 
-    knImg = face_recognition.load_image_file("3х4.jpg")
-    image = face_recognition.load_image_file(name)
-    knEnc = face_recognition.face_encodings(knImg)[0]
-    try:
-        enc = face_recognition.face_encodings(image)[0]
-        flag = face_recognition.compare_faces([knEnc], enc)
-        if flag:
-            msg = "Знакомое лицо"
-        else:
-            msg = "Новое лицо"
-
-    except Exception:
-        msg = "не удалось распознать лицо"
-
-    file = open(name, 'rb')
-    print(msg)
-    try:
-        r = post(url, data=msg)
-    except Exception:
-        print("Error in connection to server")
-    finally:
-        file.close()
-        remove(name)
-    # while True:
-    #     cv2.imshow("title", image)
-    #     if cv2.waitKey(1) & 0xFF == 27:
-    #         break
-    # session.close()
 
 def faceDetected(frame, newFace, Sargs):
+    logger = logging.getLogger("main_logger.VideoFaceFunctions.faceDetected")
     kx = Sargs["kx"]
     ky = Sargs["ky"]
     camWidth = Sargs["camWidth"]
     camHeight = Sargs["camHeight"]
     urlDist = Sargs["urlDist"]
-    print(f"new face detect! {newFace}")
     (top, right, bottom, left) = newFace
     top *= int(1 / ky)
     right *= int(1 / kx)
     bottom *= int(1 / ky)
     left *= int(1 / kx)
-    print(f"k = {koefSmall(newFace, kx, ky, camWidth, camHeight)}")
+    logger.info(f"new face detected {newFace}, face part on the frame = {koefSmall(newFace, kx, ky, camWidth, camHeight)}")
     imageToSend = frame[top:bottom, left:right]
     # cv2.imshow("new face detect!", imageToSend)
     # upload(imageToSend, urlDist)
@@ -184,64 +188,10 @@ def detect(frame, Sargs):
     return (frame, cur_face_locations)
 
 
-## функции камеры
-
-def camReader(QCameraFrames, video_capture, Sargs, QflagCont):
-    cameraSource = Sargs["cameraSource"]
-    maxInAccessWebcam=Sargs["maxInAccessWebcam"]
-    cont = True
-    inAccessWebcam = 0
-    while cont:
-        if not QflagCont.empty():
-            cont = QflagCont.get()
-
-        ret, frame = video_capture.read()
-
-        if not ret:
-            print("Video doesn't accepted!")
-            print(f"Address of webcam:  {cameraSource}")
-            if inAccessWebcam >= maxInAccessWebcam:
-                break
-            else:
-                inAccessWebcam += 1
-                continue
-        else:
-            inAccessWebcam = 0
-            QCameraFrames.put(frame)
-
-def videoPlayer(QVideoframes, QflagCont):
-    cont = True
-    while cont:
-        if not QflagCont.empty():
-            cont = QflagCont.get()
-        if not QVideoframes.empty():
-            img = QVideoframes.get()
-        else:
-            continue
-
-        cv2.imshow("videoPlayer", img)
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
-
-def justToPlay(video_capture, Sargs):
-    QFrames = Queue()
-    QflagCont = Queue()
-    CamReader = Thread(target=camReader, args=(QFrames, video_capture, Sargs, QflagCont))
-    VideoPlayer = Thread(target=videoPlayer, args=(QFrames, QflagCont))
-    CamReader.start()
-    VideoPlayer.start()
-
-    while True:
-        if not VideoPlayer.is_alive() \
-                or not CamReader.is_alive():
-            QflagCont.put(False)
-            QflagCont.put(False)
-            break
-
-
 ## однопоточный рабочий вариант
 
 def oneThreadDetection(video_capture, Sargs):
+    logger = logging.getLogger("main_logger.VideoFaceFunctions.oneThreadDetection")
     cameraSource = Sargs["cameraSource"]
     maxInAccessWebcam = Sargs["maxInAccessWebcam"]
     kadrToProcess = Sargs["kadrToProcess"]
@@ -255,18 +205,8 @@ def oneThreadDetection(video_capture, Sargs):
         curKadr+=1
         if curKadr%kadrToProcess==0:
             if not ret:
-                print("Video doesn't accepted!")
-                print(f"Address of webcam:  {cameraSource}")
-                if inAccessWebcam >= maxInAccessWebcam:
-                    print("fail to reconnect")
-                    print(f"next try to reconnect in {cameraTimeOut} seconds")
-                    sleep(cameraTimeOut)
-                    now = datetime.now()
-                    print(f"try to reconnect, {now.time().__str__()[:8]}")
-                    continue
-                else:
-                    inAccessWebcam += 1
-                    continue
+                video_capture = cameraReconnect(video_capture, Sargs)
+                continue
             else:
                 inAccessWebcam = 0
                 frame, cur_face_locations = detect(frame, Sargs)
@@ -277,101 +217,6 @@ def oneThreadDetection(video_capture, Sargs):
         # if cv2.waitKey(1) & 0xFF == 27:
         #     break
 
-## многопоточный вариант 1 - медленно
 
-def ThreadProcess(frame, QVideoFrames, QTracing, prevProc, Sargs):
-    frame, cur_face_locations = detect(frame, Sargs)
-    prevProc.join()
-    QVideoFrames.put(frame)
-    last_face_locations = QTracing.get()
-    cur_face_locations = tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs)
-    cur_face_locations = makeFaceLocationsElder(cur_face_locations, Sargs["maxKadrEmpty"])
-    QTracing.put(cur_face_locations)
-
-def multyThreadManager(QCameraFrames, QVideoFrames, Sargs, QflagCont):
-    cont = True
-    prevProc = Thread()
-    prevProc.start()
-    QTracing = Queue()
-    QTracing.put([])
-
-    while cont:
-
-        if not QflagCont.empty():
-            cont = QflagCont.get()
-        if not QCameraFrames.empty():
-            frame = QCameraFrames.get()
-            prevProc = Thread(target=ThreadProcess, args=(frame, QVideoFrames, QTracing, prevProc, Sargs))
-            # st = time()
-            prevProc.start()
-            # print(f"manager time = {time()-st:.3f}")
-
-def manyThreadDetection(video_capture, Sargs):
-    QflagCont = Queue()
-    QCameraFrames = Queue()
-    QVideoFrames = Queue()
-
-    CamReader = Thread(target=camReader, args=(QCameraFrames, video_capture, Sargs, QflagCont))
-    MultyThreadManager = Thread(target=multyThreadManager, args=(QCameraFrames, QVideoFrames, Sargs, QflagCont))
-    VideoPlayer = Thread(target=videoPlayer, args=(QVideoFrames, QflagCont))
-
-    VideoPlayer.start()
-    MultyThreadManager.start()
-    CamReader.start()
-
-    while True:
-        if not VideoPlayer.is_alive() \
-                or not CamReader.is_alive() \
-                or not MultyThreadManager.is_alive():
-            QflagCont.put(False)
-            QflagCont.put(False)
-            QflagCont.put(False)
-            break
-
-## однопоточное обнаружение в отдельном потоке - медленно
-
-def threadOfDetect(QFaces, frame, Sargs):
-    if QFaces.empty():
-        last_face_locations = []
-    else:
-        last_face_locations = QFaces.get()
-    frame, cur_face_locations = detect(frame, Sargs)
-    tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs)
-    last_face_locations = makeFaceLocationsElder(cur_face_locations, Sargs["maxKadrEmpty"])
-    QFaces.put(last_face_locations)
-
-def oneThreadDetection2(video_capture, Sargs):
-    cameraSource = Sargs["cameraSource"]
-    maxInAccessWebcam = Sargs["maxInAccessWebcam"]
-
-    last_face_locations = []
-    kadrToProcess = 100
-    curKadr = 0
-    QFaces = Queue()
-    while True:
-        ret, frame = video_capture.read()
-
-        curKadr+=1
-        if curKadr%kadrToProcess==0:
-            if not ret:
-                print("Video doesn't accepted!")
-                print(f"Address of webcam:  {cameraSource}")
-                if maxInAccessWebcam == -1:
-                    continue
-                if inAccessWebcam >= maxInAccessWebcam:
-                    print("fail to reconnect")
-                    sleep(cameraTimeOut)
-                    now = datetime.now()
-                    print(f"try to reconnect, {now.time().__str__()[:8]}")
-                    continue
-                else:
-                    inAccessWebcam += 1
-                    continue
-            else:
-                inAccessWebcam = 0
-                Thread(target=threadOfDetect, args=(QFaces, frame, Sargs)).start()
-        # cv2.imshow("title", frame)
-        # if cv2.waitKey(1) & 0xFF == 27:
-        #     break
 
 
