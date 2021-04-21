@@ -1,15 +1,17 @@
 import logging.config
 from ConsoleArgParse import getConsoleArguments
 from VideoFaceFunctions import *
-from os import makedirs, getcwd
+from os import makedirs, getcwd, path
 from shutil import rmtree
 from pathlib import Path
-from icecream import ic
 
 if __name__ == "__main__":
-# обработка консольных параметров, перезапись констант, если они были переданы
-    logging.config.fileConfig('log_conf.conf')
+    # подключение логгера
+    log_file_path = path.join(path.dirname(path.abspath(__file__)), 'log_conf.conf')
+    logging.config.fileConfig(log_file_path)
     logger = logging.getLogger("main_logger")
+
+    # обработка консольных параметров, перезапись констант, если они были переданы
     Sargs = getConsoleArguments()
     logger.info(f":\nstart\n launched with params: \n {Sargs}\nPress Ctrl+C to stop this server in console\n")
 
