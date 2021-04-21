@@ -4,6 +4,7 @@ from VideoFaceFunctions import *
 from os import makedirs, getcwd
 from shutil import rmtree
 from pathlib import Path
+from icecream import ic
 
 if __name__ == "__main__":
 # обработка консольных параметров, перезапись констант, если они были переданы
@@ -19,13 +20,12 @@ if __name__ == "__main__":
         logger.info(f"created path to temp photo: {path}")
 
     video_capture = cameraCapture(Sargs["cameraSource"])
-
     camWidth = video_capture.get(3)
     camHeight = video_capture.get(4)
-
-    if camWidth <0.1:
+    while camWidth <0.1:
         video_capture = cameraReconnect(video_capture, Sargs)
-
+        camWidth = video_capture.get(3)
+        camHeight = video_capture.get(4)
     logger.info(f"camWidth = {camWidth}, camHeigh = {camHeight}")
 
 

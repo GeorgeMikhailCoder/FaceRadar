@@ -50,7 +50,7 @@ def cameraCapture(cameraSource):
     except Exception:
         logger = logging.getLogger("main_logger.VideoFaceFunctions.cameraCapture")
         logger.error("Error while connecting to camera")
-        logger.error(Exception.__str__())
+        logger.error("Unexpected error")
     return video_capture
 
 def cameraReconnect(video_capture, Sargs):
@@ -59,33 +59,43 @@ def cameraReconnect(video_capture, Sargs):
     cameraTimeOut = Sargs["cameraTimeOut"]
     logger = logging.getLogger("main_logger.VideoFaceFunctions.cameraReconnect")
     logger.error(f"Video doesn't accepted, address of webcam:  {cameraSource}")
-    inAccessWebcam = 1
-    while True:
-        if inAccessWebcam >= maxInAccessWebcam:
-            try:
-                logger.error(f"Fail to reconnect, next try to reconnect in {cameraTimeOut} seconds")
-                video_capture.release()
-                sleep(cameraTimeOut)
-                now = datetime.now()
-                logger.error(f"Try to reconnect, {now.time().__str__()[:8]}")
-                video_capture = cameraCapture(Sargs["cameraSource"])
-            except Exception:
-                logger.error(Exception.__str__())
-        else:
-            try:
-                video_capture.release()
-                video_capture = cameraCapture(Sargs["cameraSource"])
-            except Exception:
-                logger.error(Exception.__str__())
+
+    for i in range(maxInAccessWebcam):
+        try:
+            video_capture.release()
+            video_capture = cameraCapture(Sargs["cameraSource"])
+        except Exception:
+            logger.error("Unexpected error")
 
         camWidth = video_capture.get(3)
+        camHeight = video_capture.get(4)
         if camWidth < 0.1:
             logger.error(f"Video doesn't accepted, address of webcam:  {cameraSource}")
-            inAccessWebcam += 1
         else:
             logger.info(f"Connection recieved")
-            break
-    return video_capture
+            logger.info(f"camWidth = {camWidth}, camHeigh = {camHeight}")
+            return video_capture
+
+    while True:
+        try:
+            logger.error(f"Fail to reconnect, next try to reconnect in {cameraTimeOut} seconds")
+            video_capture.release()
+            sleep(cameraTimeOut)
+            now = datetime.now()
+            logger.error(f"Try to reconnect, {now.time().__str__()[:8]}")
+            video_capture = cameraCapture(Sargs["cameraSource"])
+        except Exception:
+            logger.error("Unexpected error")
+
+        camWidth = video_capture.get(3)
+        camHeight = video_capture.get(4)
+        if camWidth < 0.1:
+            logger.error(f"Video doesn't accepted, address of webcam:  {cameraSource}")
+        else:
+            logger.info(f"Connection recieved")
+            logger.info(f"camWidth = {camWidth}, camHeigh = {camHeight}")
+            return video_capture
+
 
 def upload(image, data, url):
 # отправляем картинку по указанному url
@@ -106,7 +116,7 @@ def upload(image, data, url):
         remove(name)
 
     # while True:
-    #     cv2.imshow("title", image)
+    #     cv2.imshow("face", image)
     #     if cv2.waitKey(1) & 0xFF == 27:
     #         break
     # session.close()
@@ -128,7 +138,6 @@ def faceDetected(frame, newFace, Sargs):
     logger.info(f"new face detected {newFace}, face part on the frame = {koefSmall(newFace, kx, ky, camWidth, camHeight)}")
     imageToSend = frame[top:bottom, left:right]
     # cv2.imshow("new face detect!", imageToSend)
-    # upload(imageToSend, urlDist)
     dataToSend = {"idSource": Sargs["idSource"]}
     Thread(target=upload, args=(imageToSend, dataToSend, urlDist)).start()
 
@@ -192,12 +201,8 @@ def detect(frame, Sargs):
 
 def oneThreadDetection(video_capture, Sargs):
     logger = logging.getLogger("main_logger.VideoFaceFunctions.oneThreadDetection")
-    cameraSource = Sargs["cameraSource"]
-    maxInAccessWebcam = Sargs["maxInAccessWebcam"]
     kadrToProcess = Sargs["kadrToProcess"]
-    cameraTimeOut = Sargs["cameraTimeOut"]
     last_face_locations = []
-    inAccessWebcam = 0
     curKadr = 0
     while True:
         ret, frame = video_capture.read()
@@ -208,14 +213,17 @@ def oneThreadDetection(video_capture, Sargs):
                 video_capture = cameraReconnect(video_capture, Sargs)
                 continue
             else:
-                inAccessWebcam = 0
                 frame, cur_face_locations = detect(frame, Sargs)
                 tracingFacesSimple(cur_face_locations, last_face_locations, frame, Sargs)
                 last_face_locations = makeFaceLocationsElder(cur_face_locations, Sargs["maxKadrEmpty"])
 
-        # cv2.imshow("title", frame)
-        # if cv2.waitKey(1) & 0xFF == 27:
-        #     break
+                # try:
+                #     cv2.imshow("title", frame)
+                #     if cv2.waitKey(1) & 0xFF == 27:
+                #         break
+                # except Exception:
+                #     logger.error("Video lost")
+
 
 
 
