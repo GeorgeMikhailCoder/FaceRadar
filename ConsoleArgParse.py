@@ -11,10 +11,10 @@ def getConsoleArguments():
     import argparse
     # источник видеопотока, номер подключённой к системе камеры или ссылка на удалённую
     # example:
-    cameraSource = 0 # работает, локальная камера
+    # cameraSource = 0 # работает, локальная камера
     # cameraSource = 'http://homecam:15243@192.168.43.1:8080/video' # работает, ip webcam, локальная сеть
     # cameraSource = "rtsp://op1:Qw123456@109.194.108.56:1554/ISAPI/Streaming/Channels/101" # первая камера: парковка
-    # cameraSource = "rtsp://op1:Qw123456@109.194.108.56:2554/ISAPI/Streaming/Channels/101" # вторая камера: офис
+    cameraSource = "rtsp://op1:Qw123456@109.194.108.56:2554/ISAPI/Streaming/Channels/101" # вторая камера: офис
 
     # идентификатор текущего ПО, нужен для сетевого взаимодействия
     idSource = 0
@@ -32,7 +32,7 @@ def getConsoleArguments():
     maxDistance = 0.9
 
     # частота обработки кадров: количество кадров, которые будут пропущены между обрабатываемыми кадрами. Напрямую влияет на производитедбность.
-    kadrToProcess = 50
+    kadrToProcess = 1
 
     # количество кадров, в течение которых прежние положения лиц будут храниться в памяти
     maxKadrEmpty = 5
